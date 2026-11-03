@@ -25,7 +25,7 @@ function rebuild(){
  const room=$('room'),f=$('furniture');rect(room,0,0,700,height,'url(#wood)');rect(room,700,0,300,height,'url(#tile)');
  const door=250;rect(room,695,0,10,door-35,'#586b7b');rect(room,695,door+35,10,height-door-35,'#586b7b');block(695,0,10,door-35);block(695,door+35,10,height-door-35);
  text(room,350,27,'WORKSPACE / 工作与协作',13);text(room,850,27,'RESOURCE / 资料与服务',12);
- for(let i=0;i<capacity;i++){const x=40+(i%3)*215,y=80+Math.floor(i/3)*160;seats.push({x:x+80,y:y+35});block(x,y+48,160,64);rect(f,x+64,y+22,35,30,'#687887');rect(f,x,y+48,160,64,'#825a40');rect(f,x+3,y+48,154,53,'#d5a36e');rect(f,x+12,y+111,7,14,'#675245');rect(f,x+142,y+111,7,14,'#675245');rect(f,x+45,y+39,70,39,'#293c52');rect(f,x+49,y+43,62,30,'#617f93');rect(f,x+76,y+78,8,8,'#3c4f60');rect(f,x+55,y+88,56,8,'#e8d9b4');text(f,x+80,y+109,'工位 '+String(i+1).padStart(2,'0'),9);}
+ for(let i=0;i<capacity;i++){const x=40+(i%3)*215,y=80+Math.floor(i/3)*160;seats.push({x:x+80,y:y+35});block(x,y+48,160,64);rect(f,x+64,y+22,35,30,'#687887');rect(f,x,y+48,160,64,'#825a40');rect(f,x+3,y+48,154,53,'#d5a36e');rect(f,x+3,y+48,154,3,'#edc28d');rect(f,x+3,y+98,154,4,'#a87a50');for(let grain=0;grain<4;grain++)rect(f,x+10+grain*35,y+78+(grain%2)*12,20,1,'#bf8e5f');rect(f,x+12,y+111,7,14,'#675245');rect(f,x+142,y+111,7,14,'#675245');rect(f,x+45,y+39,70,39,'#293c52');rect(f,x+49,y+43,62,30,'#314e65');rect(f,x+52,y+46,56,4,'#83a5b4');for(let line=0;line<4;line++){rect(f,x+54,y+54+line*4,14+(line%3)*10,2,['#aad4c5','#e5cc94','#a9c2dd'][line%3]);}rect(f,x+94,y+54,10,15,'#476e83');rect(f,x+76,y+78,8,8,'#3c4f60');rect(f,x+55,y+88,56,8,'#eee2ca');for(let kr=0;kr<2;kr++)for(let kc=0;kc<12;kc++)rect(f,x+58+kc*4,y+89+kr*3,2,2,'#9f9c92');rect(f,x+122,y+88,6,9,'#e4d7bd');text(f,x+80,y+109,'工位 '+String(i+1).padStart(2,'0'),9);}
  const lounge=height-115;rect(f,35,lounge-20,290,100,'#eadfc2');rect(f,42,lounge-13,276,86,'none',{stroke:'#849779','stroke-dasharray':'4 3','stroke-width':3});rect(f,75,lounge-5,185,60,'#4b7556');rect(f,84,lounge+4,167,40,'#83a172');rect(f,71,lounge+8,18,49,'#638660');rect(f,247,lounge+8,18,49,'#638660');block(70,lounge-8,200,68);plant(f,45,lounge+55);plant(f,305,lounge+55);
  for(let i=0;i<2;i++){const x=735+i*120;rect(f,x,65,105,135,'#785640');rect(f,x+6,70,93,122,'#c49d73');for(let r=0;r<3;r++){for(let b=0;b<7;b++)rect(f,x+10+b*12,78+r*37,8,26,['#5c889b','#b67659','#85986e'][b%3]);rect(f,x+5,107+r*37,95,5,'#785640')}block(x,65,105,135)}
  for(let i=0;i<2;i++){rect(f,745+i*113,310,94,105,'#8d9ca5');for(let r=0;r<3;r++){rect(f,751+i*113,317+r*31,82,26,'#d4d9d4');rect(f,781+i*113,325+r*31,22,4,'#74848d')}block(745+i*113,310,94,105)}
@@ -39,14 +39,42 @@ function nearest(point){let best=null,dist=Infinity;for(let y=40;y<=height-20;y+
 function findPath(start,target){const a=nearest(start),b=nearest(target);if(!a||!b)return [];const key=p=>p.x+','+p.y,q=[a],seen=new Map([[key(a),null]]);let end=null;for(let i=0;i<q.length;i++){const p=q[i];if(key(p)===key(b)){end=p;break}for(const [dx,dy]of [[10,0],[-10,0],[0,10],[0,-10]]){const n={x:p.x+dx,y:p.y+dy},k=key(n);if(passable(n.x,n.y)&&!seen.has(k)){seen.set(k,p);q.push(n)}}}if(!end)return [];const result=[];while(end){result.push(end);end=seen.get(key(end))}return result.reverse()}
 function destination(a,kind){let target=seats[a.seat];if(kind==='library')target={x:800,y:225};if(kind==='sofa')target={x:155,y:height-140};if(kind==='wander')target={x:50+Math.random()*600,y:40+Math.random()*(height-80)};a.path=findPath(a,target);a.destination=kind;a.wait=0;if(a.path.length){a.x=a.path[0].x;a.y=a.path[0].y;}if(selected===a.id)details()}
 function human(a){const g=svg('g',{'class':'agent','tabindex':0,'role':'button','aria-label':a.name},$('people'));svg('ellipse',{cx:0,cy:2,rx:17,ry:5,fill:'#36454c',opacity:.16},g);rect(g,-17,-51,34,58,'transparent',{'class':'selection',rx:5});
- const body=svg('g',{'class':'body'},g);rect(body,-10,-23,20,22,a.color);rect(body,-10,-1,7,10,'#3d495a',{'class':'leg left'});rect(body,3,-1,7,10,'#3d495a',{'class':'leg right'});
- const headPlacement=svg('g',{'class':'head-placement'},g);const head=svg('g',{'class':'head'},headPlacement);rect(head,-13,-46,26,24,'#e7bb92');rect(head,-15,-49,30,10,a.hair);rect(head,-15,-43,5,12,a.hair);rect(head,10,-43,5,12,a.hair);rect(head,-8,-34,3,4,'#303747');rect(head,5,-34,3,4,'#303747');rect(head,-3,-26,6,2,'#a57564');
- rect(g,-15,-15,9,5,'#e7bb92',{'class':'paw left'});rect(g,6,-15,9,5,'#e7bb92',{'class':'paw right'});const book=svg('g',{'class':'book',visibility:'hidden'},g);rect(book,-15,-19,14,14,'#fff0ca');rect(book,0,-19,14,14,'#eadcb6');rect(book,-1,-19,2,15,'#997553');a.badge=text(g,25,-45,'',18);a.nameNode=text(g,0,28,a.name,10);g.addEventListener('click',()=>select(a.id));g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(a.id)}});a.node=g;return g}
+ const body=svg('g',{'class':'body'},g);rect(body,-12,-24,24,24,'#303a49');rect(body,-10,-23,20,22,a.color);rect(body,-8,-22,4,18,'#ffffff18');rect(body,-3,-23,6,5,'#eee4d3');rect(body,-1,-16,2,13,'#364e66');rect(body,-14,-19,4,15,a.color);rect(body,10,-19,4,15,a.color);rect(body,-10,-1,7,10,'#3d495a',{'class':'leg left'});rect(body,3,-1,7,10,'#3d495a',{'class':'leg right'});
+ const headPlacement=svg('g',{'class':'head-placement'},g);const head=svg('g',{'class':'head','shape-rendering':'crispEdges'},headPlacement);
+ // Layered 2px pixel silhouette, with ears, hair strands, eye highlights and collar.
+ const pixels=(x,y,w,h,c)=>rect(head,x,y,w,h,c);
+ pixels(-12,-49,24,3,'#282a35');pixels(-16,-46,32,18,'#282a35');pixels(-13,-28,26,7,'#282a35');pixels(-9,-21,18,3,'#282a35');
+ pixels(-13,-43,26,17,'#e8bc99');pixels(-10,-27,20,6,'#e8bc99');pixels(-16,-36,4,9,'#dca684');pixels(12,-36,4,9,'#dca684');
+ pixels(-11,-29,4,3,'#d99a85');pixels(7,-29,4,3,'#d99a85');pixels(-9,-23,18,2,'#cf997a');
+ pixels(-14,-47,28,8,a.hair);pixels(-16,-43,7,12,a.hair);pixels(10,-43,6,13,a.hair);pixels(-10,-40,7,5,a.hair);pixels(2,-40,7,3,a.hair);
+ pixels(-10,-46,7,2,'#ffffff25');pixels(-3,-44,9,2,'#ffffff20');pixels(8,-43,4,2,'#ffffff18');
+ pixels(-8,-34,4,6,'#313746');pixels(5,-34,4,6,'#313746');pixels(-8,-34,2,2,'#f8f5e9');pixels(5,-34,2,2,'#f8f5e9');
+ pixels(-1,-30,2,3,'#cf9472');pixels(-3,-24,6,2,'#915d58');pixels(-4,-18,8,3,'#edd5b7');
+ rect(g,-15,-15,9,5,'#e7bb92',{'class':'paw left'});rect(g,6,-15,9,5,'#e7bb92',{'class':'paw right'});const book=svg('g',{'class':'book',visibility:'hidden'},g);rect(book,-15,-19,14,14,'#fff0ca');rect(book,0,-19,14,14,'#eadcb6');rect(book,-1,-19,2,15,'#997553');a.badge=svg('g',{'class':'badge','shape-rendering':'crispEdges'},g);a.nameNode=text(g,0,28,a.name,10);g.addEventListener('click',()=>select(a.id));g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(a.id)}});a.node=g;return g}
+function drawBadge(g,state){
+ g.replaceChildren();
+ // Only cognition states show a thought bubble. Typing has its own keyboard action.
+ const thought=['thinking','researching','blocked','idle'].includes(state);
+ if(thought){
+  rect(g,2,0,26,2,'#435366');rect(g,0,2,30,18,'#435366');rect(g,2,20,26,2,'#435366');rect(g,2,2,26,18,'#fffdf1');
+  rect(g,0,24,5,4,'#435366');rect(g,1,25,3,2,'#fffdf1');rect(g,-4,30,3,3,'#fffdf1');
+  if(state==='idle'||state==='blocked'){for(let i=0;i<3;i++)rect(g,7+i*7,10,3,3,'#687d8b');}
+  else{svg('path',{d:'M10 7V5H19V10H16V13H13V10H16V7Z M13 16H16V19H13Z',fill:'#587b83'},g)}
+ }else if(['error','anxious'].includes(state)){
+  svg('path',{d:'M10 0L3 12V17H6V19H11V17H14V12Z',fill:'#86c4d5',stroke:'#456e8c','stroke-width':2},g);rect(g,7,10,2,5,'#dff7ee');
+ }else if(state==='done'){
+  svg('path',{d:'M13 0H17V8H25V12H17V20H13V12H5V8H13Z',fill:'#f3d47b',stroke:'#99784b','stroke-width':1},g);rect(g,28,21,4,4,'#f3d47b');
+ }else if(state==='resting'){text(g,10,15,'z',16,'#58758b');text(g,23,0,'z',11,'#58758b');}
+ else if(state==='syncing'){text(g,14,15,'↻',20,'#4f8a7b');}
+}
 function renderAgents(){for(const a of agents){if(!a.node)human(a);const seated=!a.path.length&&a.destination==='desk';const resting=!a.path.length&&a.destination==='sofa';a.node.setAttribute('transform',`translate(${a.x} ${a.y})`);a.node.setAttribute('class',`agent ${selected===a.id?'selected':''} ${seated&&['writing','executing','replying'].includes(a.state)?'typing':''} ${resting?'resting':''} ${a.state==='done'?'happy':''} ${['anxious','error'].includes(a.state)?'anxious':''}`);a.node.querySelector('.book').setAttribute('visibility',!a.path.length&&a.destination==='library'?'visible':'hidden');a.node.querySelector('.body').setAttribute('visibility',seated?'hidden':'visible');a.node.querySelectorAll('.paw').forEach(n=>n.setAttribute('visibility',seated&&['writing','executing','replying'].includes(a.state)?'visible':'hidden'));
  // Desk seat head is above the screen; the torso is occluded, not standing on furniture.
  a.node.querySelector('.head-placement').setAttribute('transform',seated?'translate(0 35)':'');a.node.querySelectorAll('.paw').forEach(n=>n.setAttribute('y',seated?45:-15));
- a.badge.setAttribute('y',seated?-20:-45);a.nameNode.setAttribute('y',seated?85:28);
- a.badge.textContent=a.path.length?'→':resting?'z':({thinking:'?',researching:'?',anxious:'!',blocked:'…',error:'!',done:'✦',idle:'·',syncing:'↻'}[a.state]||'');
+ a.badge.setAttribute('transform',`translate(18 ${seated?-49:-84})`);a.nameNode.setAttribute('y',seated?85:28);
+ const badgeState=a.path.length?'walking':resting?'resting':a.state;
+ if(a.badgeState!==badgeState){a.badgeState=badgeState;drawBadge(a.badge,badgeState);}
+ const selection=a.node.querySelector('.selection');selection.setAttribute('y',seated?-18:-53);selection.setAttribute('height',seated?36:64);
+
  if(a.path.length){const stride=Math.floor(performance.now()/160)%2;a.node.querySelector('.leg.left').setAttribute('y',stride?2:-1);a.node.querySelector('.leg.right').setAttribute('y',stride?-1:2);}}
  $('routes').replaceChildren();const a=agents.find(a=>a.id===selected);if(showPaths&&a&&a.path.length)svg('polyline',{points:[{x:a.x,y:a.y},...a.path].map(p=>p.x+','+p.y).join(' '),'class':'route'},$('routes'));}
 const services=new Map();
