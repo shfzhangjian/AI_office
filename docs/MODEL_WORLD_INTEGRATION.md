@@ -52,18 +52,13 @@
 - 采集器重启从持久事件恢复，每个会话保存最新值，最多保留 100 个会话；页面重连先读快照，之后接增量事件。
 - 模型名称、会话 ID 也是业务信息，公开部署继续遵守现有入口访问控制；禁止在这些字段中放地址、凭据或用户原文。
 
-## 2. 门、资料与经典书名
+## 2. 门与资料区
 
-角色与环境同事停在资料区查阅时，书本抽出、翻录指示及档案抽屉播放动画；最后一个查阅角色离开后恢复。当前是资料区联动动画，不代表后端真的读取了对应书籍或文件。去查资料的视觉指令和真实 researching 状态均可触发，沿用原有避障路线。
+书架已按反馈还原为上一版：四层木质书架、密排彩色竖放书本，取消大块书名标签、抽书和书架下方翻录图案。书架尺寸和寻路障碍保持原样。
+
+角色与环境同事停在资料区查阅时，保留人物翻阅与档案柜抽屉动画；最后一个查阅角色离开后抽屉恢复。去查资料的视觉指令和真实 researching 状态均可触发，沿用原有避障路线。
 
 办公室门和资料区门检测附近所有角色（包括环境员工与老板），接近自动打开，离开关闭。门动画不修改寻路网格，以免路径中途失效。
-
-每次重建书架时随机排列书名，每架包含以下四种，不在每帧随机变化。采用短标题和 8–10 SVG 单位字号，悬停显示全名与作者，只画原创书本外形，没有复制书籍封面或正文。核实来源：
-
-- [Mastering Delphi 7 / Marco Cantù](https://www.marcocantu.com/md7/default.htm)
-- [The C++ Programming Language / Bjarne Stroustrup](https://www.stroustrup.com/books.html)
-- [Effective C++ / Scott Meyers，出版社页面](https://www.informit.com/store/effective-c-plus-plus-55-specific-ways-to-improve-your-9780321334879)
-- [Expert Oracle Database Architecture / Thomas Kyte、Darl Kuhn，出版社资料](https://github.com/Apress/exp-oracle-db-architecture)
 
 ## 3. 北京时间与夜间行为
 
