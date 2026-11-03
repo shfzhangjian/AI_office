@@ -1,0 +1,51 @@
+AI Office — 我的像素办公室（Pixel Office / 种田小镇）
+=====================================================
+
+本仓库分两部分授权，请务必区分：
+
+---------------------------------------------------------------
+1) 代码 / 逻辑 —— MIT License
+---------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2026 shfzhangjian
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+代码范围：server/ collector/ video/ docs/ 中我编写的逻辑，以及 frontend/town.html
+中我编写的渲染 / 动画 / 状态机代码。
+
+---------------------------------------------------------------
+2) 像素美术素材（frontend/assets/*.png|*.webp）—— 仅限非商用
+---------------------------------------------------------------
+
+frontend/assets 下的像素美术素材（角色精灵、场景背景、家具、动画帧等）
+来自开源项目 Star-Office-UI（作者 Ring Hyacinth & Simon Lee），
+其素材授权为「仅限学习 / 演示 / 分享，不得商用」。详见
+frontend/assets/LICENSE-Star-Office-UI.txt。
+
+- 你可以把这些素材用于学习、演示、二次创作展示。
+- 你**不得**将这些素材用于任何商业用途。若要商用，请把素材整体替换为你自己的原创美术。
+- Guest 角色动画使用 LimeZu 的免费素材
+  （Animated Mini Characters 2 (Platformer) [FREE]，https://limezu.itch.io/animated-mini-characters-2-platform-free），
+  再分发 / 演示时请保留该署名并遵循原作者授权条款。
+
+如你只想要「可商用」的版本，删除 frontend/assets 目录、接入自己的素材即可，
+代码部分（MIT）不受影响。

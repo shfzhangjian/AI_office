@@ -1,0 +1,29 @@
+# 运行时数据（真实事件账 / 快照 / 天气缓存 / 自报状态）不入库
+# 仓库自带 samples/ 作为可跑示例；真实部署时由 collectord 写到 TOWN_DIR（默认 ~/ai-office-town）
+events.jsonl
+snapshot.json
+weather.json
+state.json
+.weather_ts
+
+# 视频合成的中间产物（帧 / 分段 / 字幕带），只保留脚本与成片
+video/frames/
+video/audio/
+video/band/
+video/parts/
+video/subpng/
+video/_*.mp4
+video/_*.m4a
+video/part_*.mp4
+video/*.log
+video/durations.json
+video/vf.txt
+video/list.txt
+video/subs.ass
+video/subs.srt
+
+# 依赖与系统垃圾
+node_modules/
+.DS_Store
+*.log
+*.tmp

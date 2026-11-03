@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>我的像素办公室</title>
+<style>
+:root{--paper:#f2ecd8;--ink:#2a2318;--line:#c9c0a4;}
+*{box-sizing:border-box}
+body{margin:0;font-family:"PingFang SC","Hiragino Sans GB",sans-serif;background:#171512;color:var(--ink)}
+header{display:flex;align-items:center;gap:14px;padding:10px 16px;background:#1f1c17;border-bottom:2px solid #3a352b;flex-wrap:wrap}
+h1{font-size:17px;margin:0;color:#e8dfc0;letter-spacing:1px}
+#clock{font-size:12px;color:#8a815f}
+#memo{font-size:12px;color:#b0a67e}
+#weather{font-size:13px;font-weight:600;margin-left:auto;color:#e8dfc0}
+main{display:flex;gap:14px;padding:14px;flex-wrap:wrap;justify-content:center}
+#office{flex:0 1 860px;background:#000;border:3px solid #3a352b;border-radius:10px;overflow:hidden;position:relative}
+canvas{display:block;width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges}
+#statebar{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.75));color:#f0e8c8;padding:18px 16px 10px;font-size:14px;font-weight:700;text-shadow:0 1px 2px #000;pointer-events:none}
+#statebar small{font-weight:400;color:#c8bd94}
+#feed{flex:1 1 320px;max-height:600px;display:flex;flex-direction:column;background:#f2ecd8;border:2px solid #57503c;border-radius:10px;padding:10px}
+h2{font-size:13px;margin:0 0 8px;color:#6a6142;font-family:ui-monospace,Menlo,monospace}
+#events{overflow:auto;flex:1;font-size:12px;font-family:ui-monospace,Menlo,monospace;color:#3a3222}
+.ev{padding:3px 2px;border-bottom:1px dashed #d5cbab;display:flex;gap:6px;align-items:baseline}
+.ev .t{color:#9a9170;flex-shrink:0}
+.ev .s{font-weight:700;flex-shrink:0}
+.ok .s{color:#2f7f2f}.err .s{color:#a33323}.warn .s{color:#a37707}.run .s{color:#2b5aa0}.info .s{color:#665}
+#toast{position:fixed;left:14px;bottom:14px;background:#2a2318;color:#f2ecd8;padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .5s;z-index:9;max-width:70vw}
+footer{width:100%;text-align:center;color:#6a6250;font-size:11px;padding:0 10px 14px}
+#loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#e8dfc0;background:#171512;font-size:14px;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div id="snowfx" style="position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:8"></div>
+<header>
+  <h1>🕹️ 我的像素办公室</h1><span id="clock">…</span><span id="memo"></span><span id="weather">天气…</span>
+</header>
+<main>
+  <div id="office">
+    <div id="loading">正在掀开地板铺像素…</div>
+    <canvas id="cv" width="1280" height="720"></canvas>
+    <div id="statebar"><span id="sbText">💤 idle · 待命中</span> <small id="sbSeq"></small></div>
+  </div>
+  <section id="feed">
+    <h2>▸ 镇情快报（事件流）</h2>
+    <div id="events"></div>
+  </section>
+</main>
+<footer>像素素材 © Star-Office-UI（ringhyacinth & Simon Lee，代码 MIT / 素材仅非商用学习）· Guest 角色 © LimeZu · 状态管道 collectord + SSE · 事件底账 TOWN_DIR/events.jsonl</footer>
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const A = 'town-assets/';
+const STATUS_CLASS = { done:'ok', up:'ok', online:'ok', ok:'ok', running:'run', failed:'err', timeout:'err', down:'err', offline:'err', warn:'warn', note:'info', writing:'run', executing:'run', researching:'run', syncing:'run', receiving:'info', replying:'info', idle:'info', error:'err' };
+
+// ===== 精灵加载与网格动画 =====
+function loadImg(src){ return new Promise((res,rej)=>{const i=new Image();i.crossOrigin='anonymous';i.onload=()=>res(i);i.onerror=rej;i.src=src;}); }
+const SPR = {};           // name -> {img, fw, fh, cols, rows, count}
+function grid(img, fw, fh, count){ const cols=Math.round(img.width/fw); return {img, fw, fh, cols, count}; }
+let seqCounter = 0;
+
+async function loadAll(){
+  const jobs = [
+    loadImg(A+'office_bg.webp').then(i=>SPR.bg=i),
+    loadImg(A+'desk-v3.png').then(i=>SPR.desk=i),
+    loadImg(A+'sofa-idle-v3.png').then(i=>SPR.sofa=i),
+    loadImg(A+'plants-spritesheet.png').then(i=>SPR.plants=grid(i,160,160,16)),
+    loadImg(A+'posters-spritesheet.png').then(i=>SPR.posters=grid(i,160,160,16)),
+    loadImg(A+'cats-spritesheet.png').then(i=>SPR.cats=grid(i,160,160,16)),
+    loadImg(A+'serverroom-spritesheet.png').then(i=>SPR.servers=grid(i,180,251,40)),
+    loadImg(A+'flowers-bloom-v2.png').then(i=>SPR.flowers=i),
+    // 角色动画（工作帧带 #26232e 深紫底，运行时色键抠底）
+    loadImg(A+'star-idle-v5.png').then(i=>SPR.idle=grid(i,128,128,192)),
+    loadImg(A+"star-work-clean.png").then(i=>{const cc=document.createElement('canvas');cc.width=i.width;cc.height=i.height;const xx=cc.getContext('2d');xx.imageSmoothingEnabled=false;xx.drawImage(i,0,0);SPR.writing=grid(cc,230,144,80);}),
+    loadImg(A+'sync-animation-v3-grid.png').then(i=>SPR.syncing=grid(i,256,256,49)),
+    loadImg(A+'error-bug-spritesheet-grid.png').then(i=>SPR.error=grid(i,180,180,99)),
+    loadImg(A+'guest_anim_1.webp').then(i=>SPR.researching=grid(i,128,64,1)),
+  ];
+  await Promise.allSettled(jobs);
+  $('loading').style.display='none';
+}
+
+// ===== 状态 → 动画 + 站位（layout.js 的坐标）=====
+const AREAS = {
+  researching:{x:320,y:360}, replying:{x:430,y:400},
+  receiving:{x:640,y:400}, syncing:{x:1000,y:470}, error:{x:1050,y:300}, idle:{x:660,y:400}
+};
+const ANIM_OF = { writing:'writing', executing:'writing', researching:'writing', syncing:'syncing', error:'error', idle:'idle', receiving:'writing', replying:'writing' };
+const STATE_LABEL = { idle:'💤 摸鱼待命', writing:'✍️ 输出中', receiving:'📥 收消息', replying:'💬 回复中', researching:'🔎 调研中', executing:'⚡ 执行任务', syncing:'☁️ 同步中', error:'🔴 出错了' };
+
+let selfState='idle', selfDetail='', animFrame=0, lastTick=0, walkFrom=null, walkTo=null, walkT=0;
+let starPos={...AREAS.idle};
+function setSelf(state, detail){
+  if (state===selfState && (detail||'')===selfDetail) return;
+  selfState=state; selfDetail=detail||'';
+  $('sbText').textContent = (STATE_LABEL[state]||state) + (detail?' · '+detail.slice(0,40):'');
+  const t = AREAS[state]||AREAS.idle;
+  walkFrom={...starPos}; walkTo=t; walkT=0;
+}
+
+// ===== 事件流 =====
+const evbox = $('events'); let lastSeq = 0;
+function addEv(e, pre){
+  const d = document.createElement('div');
+  d.className = 'ev ' + (STATUS_CLASS[e.status]||'info');
+  const t = new Date(e.ts);
+  d.innerHTML = `<span class="t">${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}</span><span class="s">${e.status}</span><span>${e.source}/${e.subject} ${(e.summary||'').slice(0,60)}</span>`;
+  pre ? evbox.appendChild(d) : evbox.prepend(d);
+  while (evbox.children.length > 300) evbox.removeChild(evbox.lastChild);
+}
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.style.opacity=1; setTimeout(()=>t.style.opacity=0,5000); }
+
+const svc = { dsh:true, model:true, pm2:true, guard:true, tunnel:true };
+function paint(e){
+  if (e.type==='state'){ setSelf(e.status, e.summary); if(e.status==='error') toast('🔴 '+ (e.summary||'我卡住了')); return; }
+  if (e.source==='dsh') svc.dsh = e.status==='up';
+  if (e.source==='model') svc.model = e.status==='up';
+  if (e.source==='panel'||e.source==='pm2') svc.pm2 = (svc.pm2||e.status==='online');
+  if (e.subject==='dsh-web'&&e.source==='dsh') { if(!svc.dsh){ selfState='error'; $('sbText').textContent='🔴 dsh 掉了'; } }
+}
+
+function connect(){
+  const es = new EventSource('/api/town-events');
+  es.onmessage = m => { const e=JSON.parse(m.data); if(e.seq<=lastSeq)return; lastSeq=e.seq; addEv(e); paint(e);
+    $('sbSeq').textContent = '· 第 '+e.seq+' 手';
+    if (e.type==='task'&&e.status==='done') toast('🌾 收成！'+(e.summary||e.subject));
+    if (e.type==='task'&&(e.status==='failed'||e.status==='timeout')) toast('🥀 '+(e.summary||e.subject)+' '+e.status); };
+  es.onerror = () => { es.close(); setTimeout(connect, 5000); };
+}
+connect();
+
+// ===== 绘制循环 =====
+const cv = $('cv'), ctx = cv.getContext('2d');
+function drawGridSprite(g, x, y, scale, fps, offsetFrames){
+  const total = g.count; const f = (Math.floor(animFrame/ (60/Math.max(fps,1))) + (offsetFrames||0)) % total;
+  const col = f % g.cols, row = Math.floor(f/g.cols);
+  ctx.drawImage(g.img, col*g.fw, row*g.fh, g.fw, g.fh, x - g.fw*scale/2, y - g.fh*scale, g.fw*scale, g.fh*scale);
+}
+function drawGridSpriteFrame(g, frame, x, y, scale){ const col=frame%g.cols, row=Math.floor(frame/g.cols); ctx.drawImage(g.img, col*g.fw, row*g.fh, g.fw, g.fh, x-g.fw*scale/2, y-g.fh*scale, g.fw*scale, g.fh*scale); }
+// 精灵图带纯色底时的抽帧版：色键抠掉底，再裁剪到内容包围盒
+function keySprite(img, fw, fh, count){
+  const c=document.createElement('canvas'); c.width=fw; c.height=fh;
+  const x=c.getContext('2d',{willReadFrequently:true});
+  x.drawImage(img,0,0,fw,fh,0,0,fw,fh);
+  const d=x.getImageData(0,0,fw,fh), p=d.data;
+  // 底色=四边中位色（自动适配黑/紫底），洪水填充只清与边框连通的近底色区
+  const samp=[]; for(let px=0;px<fw;px+=7){samp.push([px,0]);samp.push([px,fh-1]);} for(let py=0;py<fh;py+=7){samp.push([0,py]);samp.push([fw-1,py]);}
+  let br=0,bg2=0,bb=0; samp.forEach(([px,py])=>{const i=(py*fw+px)*4; br+=p[i];bg2+=p[i+1];bb+=p[i+2];});
+  br/=samp.length; bg2/=samp.length; bb/=samp.length;
+  const W=fw,H=fh, seen=new Uint8Array(W*H), q=[];
+  const isBg=(px,py)=>{const i=(py*W+px)*4; return Math.abs(p[i]-br)<50&&Math.abs(p[i+1]-bg2)<50&&Math.abs(p[i+2]-bb)<50;};
+  for(let px=0;px<W;px++){q.push([px,0]);q.push([px,H-1]);}
+  for(let py=0;py<H;py++){q.push([0,py]);q.push([W-1,py]);}
+  while(q.length){const [px,py]=q.pop(); if(px<0||py<0||px>=W||py>=H)continue; const id=py*W+px; if(seen[id])continue; seen[id]=1; if(!isBg(px,py))continue; p[id*4+3]=0; q.push([px+1,py],[px-1,py],[px,py+1],[px,py-1]);}
+  x.putImageData(d,0,0);
+  // 包围盒
+  let minX=fw,minY=fh,maxX=0,maxY=0;
+  for(let i=0;i<p.length;i+=4){ if(p[i+3]>0){const px=(i/4)%fw,py=Math.floor((i/4)/fw); if(px<minX)minX=px; if(px>maxX)maxX=px; if(py<minY)minY=py; if(py>maxY)maxY=py;} }
+  if(maxX<=minX) return {img:c, fw, fh, cols:1, count:1};
+  const w=maxX-minX+1, h=maxY-minY+1;
+  const c2=document.createElement('canvas'); c2.width=w; c2.height=h;
+  c2.getContext('2d').drawImage(c,minX,minY,w,h,0,0,w,h);
+  return {img:c2, fw:w, fh:h, cols:1, count:1};
+}
+const keyedCache={};
+function keyBlackSprite(g){
+  if(g.__keyed) return g.__keyed;
+  const cols=g.cols, rows=Math.ceil(g.count/cols);
+  const c=document.createElement('canvas'); c.width=g.img.width; c.height=g.img.height;
+  const x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(g.img,0,0);
+  const d=x.getImageData(0,0,c.width,c.height), p=d.data;
+  for(let i=0;i<p.length;i+=4){ const m=Math.max(p[i],p[i+1],p[i+2]); if(m<28){p[i+3]=0;} else if(m<70){const t=(m-28)/42; p[i+3]=Math.round(p[i+3]*(0.5+0.5*t));} }
+  x.putImageData(d,0,0);
+  g.__keyed={img:c, fw:g.fw, fh:g.fh, cols:g.cols, count:g.count};
+  return g.__keyed;
+}
+function drawAnchored(name, g, x, y, scale, fps){
+  // 以脚点 (x,y) 为锚，帧底对齐；走路插值由外层维护 starPos
+  const total=g.count, f=(Math.floor(animFrame/(60/Math.max(fps,1)))%total+total)%total;
+  const col=f%g.cols, row=Math.floor(f/g.cols);
+  const w=g.fw*scale, h=g.fh*scale;
+  ctx.drawImage(g.img, col*g.fw, row*g.fh, g.fw, g.fh, x-w/2, y-h, w, h);
+}
+function draw(dt){ try { drawInner(dt); } catch(e){ ctx.font='28px monospace'; ctx.fillStyle='#f33'; ctx.fillText('ERR:'+e.message, 40, 380); throw e; } }
+function drawInner(dt){
+  if(window.__demoMode){window.demoEase(); const c=window.__cam; ctx.save(); ctx.translate(640,400); ctx.scale(c.z,c.z); ctx.translate(-c.x,-c.y);}
+  animFrame += dt/1000*30;
+  ctx.imageSmoothingEnabled=false;
+  ctx.clearRect(0,0,1280,720);
+  if(SPR.bg) ctx.drawImage(SPR.bg,0,0,1280,720);
+  // 装饰（静态帧位）
+  if(SPR.posters){ const f0=16+(Math.floor(animFrame/600)%8)*2; drawGridSpriteFrame(SPR.posters, f0, 252, 226, .9); }
+  if(SPR.plants){ drawGridSpriteFrame(SPR.plants, 5, 230, 300, 1); drawGridSpriteFrame(SPR.plants, 12, 977, 610, 1); }
+  if(SPR.sofa){ const sc=.8; ctx.drawImage(SPR.sofa, 640-128*sc, 60, 256*sc, 256*sc); }
+  if(SPR.flowers) ctx.drawImage(SPR.flowers, 282, 356, 52, 52);
+  // 服务器房 = pm2 机房；dsh 挂了/模型挂了 → 服务器区变暗
+  if(SPR.servers){
+    ctx.save(); if(!svc.model||!svc.pm2) ctx.globalAlpha=.25;
+    drawGridSprite(SPR.servers, 1041, 393, .9, svc.model?6:0.8, 0); ctx.restore();
+  }
+  // 同步动画（syncing 或后台有 running dtask 时展示）
+  if(SPR.syncing && (selfState==='syncing' || window.__busyTasks)) drawGridSprite(SPR.syncing, 1157, 692, .8, 12, 1);
+  // 桌 + 角色（Star-Office 的 depth 顺序：star(900) < desk(1000)）
+  // 走路插值
+  if(walkTo){ walkT=Math.min(1,walkT+dt/1400); starPos={x:walkFrom.x+(walkTo.x-walkFrom.x)*walkT, y:walkFrom.y+(walkTo.y-walkFrom.y)*walkT}; if(walkT>=1) walkTo=null; }
+  const at = starPos;
+  const g0 = SPR[ANIM_OF[selfState]] || SPR.idle; let g = g0;
+  if(g){
+    if(ANIM_OF[selfState]==='writing'){
+      const gg = SPR.writing;
+      const sc=1.22; const w=230*sc, h=144*sc;
+      const cyc=[0,1,2,3,4,5,6,7,8,9,10,11,10,9,8,7,6,5,4,3,2,1];  // 相邻12帧乒乓=钳子敲动
+      const f=(cyc[Math.floor(animFrame/4)%cyc.length])%gg.count;
+      const col=f%gg.cols, row=Math.floor(f/gg.cols);
+      if(SPR.desk) ctx.drawImage(SPR.desk, 118, 336, 276, 214);
+      ctx.drawImage(gg.img, col*230, row*144, 230, 144, 368-w/2, 482-h/2, w, h);
+    } else {
+      if(SPR.desk) ctx.drawImage(SPR.desk, 118, 336, 276, 214);
+      if(selfState==='error'){
+        ctx.save(); ctx.globalAlpha=.85+.15*Math.sin(animFrame/6); drawGridSprite(g, at.x, at.y+10, .9, 12, 0); ctx.restore();
+      } else {
+        drawGridSprite(g, at.x, at.y+10, 1.35, 10, 0);
+      }
+    }
+  }
+  // 猫（常驻，随机帧慢放）
+  if(SPR.cats) drawGridSpriteFrame(SPR.cats, 3+(Math.floor(animFrame/300)%3)*4, 118, 700, .62);
+  // error 红色氛围
+  if(selfState==='error'){ ctx.fillStyle='rgba(200,30,30,'+(0.06+0.05*Math.sin(animFrame/10))+')'; ctx.fillRect(0,0,1280,720); }
+  // 雪（现实同步）
+  if(window.__snow){ /* DOM 层负责 */ }
+  if(window.__demoMode) ctx.restore();
+  requestAnimationFrame(draw);
+}
+loadAll().then(()=>{ requestAnimationFrame(draw); });
+
+// ===== 昨日回顾 / 天气 =====
+function yesterdayMemo(){
+  fetch('/api/town-events-brief?day=yesterday').then(r=>r.json()).then(list=>{
+    let done=0,failed=0; (list||[]).forEach(e=>{ if(e.type==='task'&&e.status==='done')done++; if(e.type==='task'&&(e.status==='failed'||e.status==='timeout'))failed++; });
+    $('memo').textContent = done+failed? `昨日：收成${done}·枯苗${failed}` : '昨日休耕';
+  }).catch(()=>{});
+}
+fetch('/api/town-snapshot').then(r=>r.json()).then(s=>{(s.events||[]).slice().reverse().forEach(e=>{lastSeq=Math.max(lastSeq,e.seq);addEv(e,true);paint(e);}); if(s.events&&s.events[0]) $('sbSeq').textContent='· 第 '+s.events[0].seq+' 手'; yesterdayMemo();}).catch(()=>yesterdayMemo());
+
+fetch('/api/town-weather').then(r=>r.json()).then(d=>{
+  const c=d.current,code=c.weather_code;
+  const snow=[71,73,75,77,85,86].includes(code), rain=[51,53,55,61,63,65,80,81,82].includes(code);
+  $('weather').textContent=`${snow?'❄️雪':rain?'🌧️雨':code>=1?'☁️':'☀️'} ${Math.round(c.temperature_2m)}° 北京`;
+  if(snow||rain){ window.__snow=snow; const L=$('snowfx'); const ch=snow?'❄':'💧';
+    setInterval(()=>{const s=document.createElement('span');s.textContent=ch;s.style.cssText=`position:absolute;left:${Math.random()*100}vw;top:-20px;font-size:${10+Math.random()*10}px;transition:transform 7s linear,opacity 7s`;L.appendChild(s);requestAnimationFrame(()=>{s.style.transform='translateY(105vh)';s.style.opacity=.2;});setTimeout(()=>s.remove(),7200);}, snow?420:220); }
+}).catch(()=>{});
+
+setInterval(()=>{ $('clock').textContent=new Date().toLocaleString('zh-CN',{hour12:false}); },1000);
+
+// ===== 视频演示控制 API =====
+(function(){
+  let cam={x:640,y:360,z:1, tx:640,ty:360,tz:1};
+  const _di=setSelf;
+  window.__demoMode=true;
+  window.setFeed=function(){};
+  window.demo=function(x,y,z){cam.tx=x;cam.ty=y;cam.tz=z;};
+  window.demoEase=function(){cam.x+=(cam.tx-cam.x)*0.04;cam.y+=(cam.ty-cam.y)*0.04;cam.z+=(cam.tz-cam.z)*0.04;};
+  window.__cam=cam;
+  // 挂到 drawInner 末尾（rAF 每帧）
+  const _origDraw = window.__origDrawInner || drawInner;
+  window.__origDrawInner = _origDraw;
+  window.drawInner = function(dt){ demoEase(); _origDraw(dt); };
+})();
+</script>
+</body>
+</html>
