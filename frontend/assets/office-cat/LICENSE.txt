@@ -1,0 +1,6 @@
+Office cat SVG assets
+Copyright (c) 2026 AI_office contributors
+
+These original geometric SVG drawings are licensed under the MIT License
+provided in the repository LICENSE for code. No third-party character assets
+were used to construct these SVGs. This license applies only to this folder.
