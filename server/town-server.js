@@ -17,7 +17,7 @@ const path = require('path');
 
 const PORT = parseInt(process.env.LT_PORT || '3002', 10);
 const HOST = process.env.LT_HOST || '127.0.0.1';
-const TOWN_DIR = process.env.TOWN_DIR || path.join(process.env.HOME, 'ai-office-town');
+const TOWN_DIR = process.env.TOWN_DIR || path.join(require('os').homedir(), 'ai-office-town');
 // 前端目录：本仓库里 server/ 与 frontend/ 平级
 const FRONTEND = process.env.TOWN_FRONTEND || path.join(__dirname, '..', 'frontend');
 
@@ -49,7 +49,7 @@ let es=null,paused=false;pause.onclick=()=>{paused=!paused;pause.textContent=pau
 fetch('/api/logs').then(r=>r.json()).then(ls=>{
  ls.forEach((l,i)=>{const b=document.createElement('button');b.textContent=l.name;b.dataset.id=l.id;
   if(i===0)b.classList.add('on');b.onclick=()=>{document.querySelectorAll('#tabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');open(l.id);};tabs.appendChild(b);});
- open(ls[0].id);});
+ if(ls.length) open(ls[0].id); else out.textContent='未配置日志源';});
 function open(id){if(es)es.close();out.textContent='';es=new EventSource('/api/stream/'+id);
  es.onmessage=e=>{if(paused)return;out.textContent+=e.data+'\\n';const n=out.innerText.split('\\n').length;if(n>3000)out.innerText=out.innerText.split('\\n').slice(-2000).join('\\n');out.scrollTop=out.scrollHeight;};}
 </script></body></html>`;
@@ -115,17 +115,9 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (url.pathname === '/api/town-weather') {
-    try {
-      const { execFileSync } = require('child_process');
-      // 天气脚本：优先环境变量 WEATHER_SCRIPT，其次 TOWN_DIR，再退回本仓库 collector/
-      const candidates = [process.env.WEATHER_SCRIPT, TOWN_DIR + '/weather.sh', path.join(__dirname, '..', 'collector', 'weather.sh')].filter(Boolean);
-      const script = candidates.find(f => { try { return fs.statSync(f).isFile(); } catch { return false; } });
-      if (!script) { res.writeHead(503, { 'Content-Type': 'application/json' }); res.end('{}'); return; }
-      // 先把脚本输出整段取回，再一次性发头，避免 execFileSync 抛错时头已发出导致二次写头崩溃
-      const buf = execFileSync('/bin/bash', [script], { timeout: 12000 });
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(buf);
-    } catch { res.writeHead(503, { 'Content-Type': 'application/json' }); res.end('{}'); }
+    fs.promises.readFile(path.join(TOWN_DIR, 'weather.json'), 'utf8')
+      .then(raw => { const data = JSON.parse(raw); res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify(data)); })
+      .catch(() => { res.writeHead(503, {'Content-Type':'application/json'}); res.end('{}'); });
     return;
   }
   if (url.pathname === '/api/town-snapshot') {
@@ -135,20 +127,25 @@ const server = http.createServer((req, res) => {
   }
   if (url.pathname === '/api/town-events') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
-    const after = parseInt(url.searchParams.get('after') || '0', 10) || 0;
-    const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
-    let offset = 0;
+    let after = Math.max(Number(url.searchParams.get('after')) || 0, Number(req.headers['last-event-id']) || 0);
+    const send = (obj) => { after = obj.seq; res.write(`id: ${obj.seq}\ndata: ${JSON.stringify(obj)}\n\n`); };
+    res.flushHeaders();
+    let offset = 0, pending = Buffer.alloc(0);
     const flush = () => {
       try {
         const size = fs.statSync(TOWN_EVENTS).size;
-        if (size < offset) offset = 0;
+        if (size < offset) { offset = 0; pending = Buffer.alloc(0); }
         if (size > offset) {
           const fd = fs.openSync(TOWN_EVENTS, 'r');
           const buf = Buffer.alloc(Math.min(size - offset, 256 * 1024));
           fs.readSync(fd, buf, 0, buf.length, offset);
           fs.closeSync(fd);
           offset += buf.length;
-          for (const line of buf.toString('utf8').split('\n')) {
+          pending = Buffer.concat([pending, buf]);
+          const end = pending.lastIndexOf(10);
+          const complete = end < 0 ? '' : pending.subarray(0, end).toString('utf8');
+          if (end >= 0) pending = pending.subarray(end + 1);
+          for (const line of complete.split('\n')) {
             if (!line) continue;
             try { const e = JSON.parse(line); if (e.seq > after) send(e); } catch {}
           }
@@ -158,7 +155,7 @@ const server = http.createServer((req, res) => {
     // 首屏：直接全量回放（前端按 after 过滤），再增量
     flush();
     let w = null; try { w = fs.watch(TOWN_EVENTS, flush); } catch {}
-    const t = setInterval(flush, 3000);
+    const t = setInterval(() => { flush(); res.write(': heartbeat\n\n'); }, 3000);
     res.on('close', () => { clearInterval(t); if (w) try { w.close(); } catch {} });
     return;
   }

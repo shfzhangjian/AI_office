@@ -48,7 +48,7 @@
                         │  Server-Sent Events
         ┌───────────────▼─────────────────────────────┐
         │  渲染层  frontend/town.html  (纯 Canvas 网页)  │
-        │  六态状态机 → 精灵动画 + 走路插值 + 天气同步     │
+        │  八态状态机 → 精灵动画 + 走路插值 + 天气同步     │
         └───────────────────────────────────────────────┘
 ```
 
@@ -58,7 +58,7 @@
 2. **文件即总线**：状态用 `state.json`、事件用 `events.jsonl` 传递。没有数据库、没有消息队列、没有 RPC —— 一个文件就是一个组件的接口，谁都能独立重启、独立替换。
 3. **只在变化时记账**：采集器对每个源记 `signature`，状态没变就什么都不写。一天下来账本只有几十条有效事件，而不是一坨心跳噪音。
 
-### 六个工作状态（状态机）
+### 八个工作状态（状态机）
 
 `idle` · `writing` · `receiving` · `replying` · `researching` · `executing` · `syncing` · `error`
 
@@ -127,7 +127,7 @@ AI_office/
 ├── server/town-server.js     只读服务：/town 页 + SSE 事件 + 快照 + 天气 + 素材（零 npm 依赖）
 ├── collector/
 │   ├── collectord.js         旁路采集器（pm2 常驻）
-│   ├── town_state.sh         一条命令改自报状态（六态状态机）
+│   ├── town_state.sh         一条命令改自报状态（八态状态机）
 │   └── weather.sh            open-meteo 天气旁路，缓存 15 分钟
 ├── frontend/
 │   ├── town.html             像素小镇本体（Canvas 渲染 + 事件流 + 状态名牌）
@@ -163,7 +163,7 @@ AI_office/
 
 - **加建筑**：`collectord.js` 加一个 `tcpProbe(port)` 采集器 → `town.html` 加一个 `<g id>` 建筑节点 → 重启两个进程，新建筑下个 tick 自动点亮。三步指南见 [`docs/我开口记账.md`](docs/我开口记账.md)。
 - **换皮**：删掉 `frontend/assets/`，接你自己的原创像素素材即可（代码不认素材内容，只认精灵图网格尺寸）。
-- **加状态**：六态想扩到更多，改 `collectord.js` 的 `normalizeState` + `town.html` 的 `AREAS/ANIM_OF/STATE_LABEL` 三处映射即可。
+- **加状态**：八态想扩到更多，改 `collectord.js` 的 `normalizeState` + `town.html` 的 `AREAS/ANIM_OF/STATE_LABEL` 三处映射即可。
 - **外网监工**：`cloudflared tunnel --url http://127.0.0.1:3002` 一条命令拿到临时公网域名，手机随时来看 AI 干活。
 
 ---
@@ -180,3 +180,17 @@ AI_office/
 ---
 
 *状态管道：collectord + SSE · 事件底账：`TOWN_DIR/events.jsonl` · 一只敲键盘的橘猫，替你盯着这台机器。*
+
+## 2026-11-03 更新
+
+修复动画加速、角色映射、事件完整性和状态恢复问题，详见 [CHANGELOG.md](CHANGELOG.md)。
+
+Windows PowerShell 示例：
+```powershell
+$env:TOWN_DIR = Join-Path $PWD samples
+node server/town-server.js
+```
+
+天气接口现在只读取缓存，请使用系统定时任务每 15 分钟运行 `node collector/weather.js`；首次可手动运行一次。旧 weather.sh 仍可更新同一缓存。缺少缓存时页面显示天气暂不可用。状态脚本需要 Bash/Python（Windows 可通过 WSL 使用）。
+
+事件账本由单个采集器独占写入；外部程序应写 state.json，禁止直接追加 seq=0 事件。公网分享请在隧道入口配置身份验证。素材授权保持原样。
