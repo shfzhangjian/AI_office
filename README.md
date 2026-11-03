@@ -232,3 +232,7 @@ node server/town-server.js
 桌面纸张由每位角色的事件独立驱动：工作/资料日志增加，新任务增加，完成或归档减少。任务状态使用任务 subject 去重，同一序号回放不重复增加。`document`/`log`/`note` 事件可带 `agent_id` 和 `documents_count`（绝对数量）或 `documents_delta`（增减数量）；范围限制 0–12，纸堆最多显示 8 层。未提供数量时仅作为日志活动的视觉映射，不代表真实文档统计。刷新后从可用快照与事件恢复，完整精确数量应由上游显式上报。
 
 演示模式每 3.5 秒产生一条明确标注的模拟资料日志，展示纸堆增减，暂停动画时同时暂停模拟更新；实时模式不进行随机或定时增减。
+
+## 接入真实接口
+
+现在支持 `POST /api/town-events` 上报多角色状态、任务、资料变化和服务负载；使用 `node server/start.js` 同时启动网页与采集器。完整请求示例、鉴权、回执与运行方式见 [docs/API.md](docs/API.md)。上报工具：`node collector/report.js event.json`。

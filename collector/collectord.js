@@ -29,22 +29,51 @@ fs.mkdirSync(TOWN, { recursive: true });
 let seq = 0;
 const history = [];
 const entities = {};
+const agentRecords = Object.create(null);
+const appliedInbox = new Map();
 try {
   for (const line of fs.readFileSync(EVENTS, 'utf8').split('\n')) {
-    try { const e = JSON.parse(line); if (!Number.isSafeInteger(e.seq) || e.seq <= 0) continue; seq = Math.max(seq, e.seq); history.push(e); entities[`${e.source}:${e.subject}`] = e; } catch {}
+    try { const e = JSON.parse(line); if (!Number.isSafeInteger(e.seq) || e.seq <= 0) continue; seq = Math.max(seq, e.seq); history.push(e); entities[`${e.source}:${e.subject}`] = e; projectAgent(e); if(e.event_id)appliedInbox.set(e.event_id,e.seq); } catch {}
   }
   // Separate a crash-truncated tail from the next complete record.
   const raw = fs.readFileSync(EVENTS);
   if (raw.length && raw[raw.length-1] !== 10) fs.appendFileSync(EVENTS, '\n');
 } catch (e) { if (e.code !== 'ENOENT') throw e; }
-const emit = (source, type, subject, status, summary, link) => {
-  const ev = { seq: seq + 1, ts: new Date().toISOString(), source, type, subject, status, summary: summary || '', link: link || '' };
+const emit = (source, type, subject, status, summary, link, extra = {}) => {
+  const ev = { ...extra, seq: seq + 1, ts: new Date().toISOString(), source, type, subject, status, summary: summary || '', link: link || '' };
   fs.appendFileSync(EVENTS, JSON.stringify(ev) + '\n');
   seq = ev.seq;
+  projectAgent(ev);if(ev.event_id)appliedInbox.set(ev.event_id,ev.seq);
   history.push(ev); if (history.length > 100) history.shift();
   entities[`${source}:${subject}`] = ev;
   return ev;
 };
+
+// Rebuild complete per-agent projections from the durable ledger, including documents.
+function projectAgent(e){
+ if(!['state','task','document','log'].includes(e.type))return;
+ const id=String(e.agent_id||(e.type==='state'?e.subject:'me'));
+ const a=agentRecords[id]||(agentRecords[id]={id,name:e.agent_name||id,state:'idle',task:'',detail:'',progress:null,documents_count:0,pending_tasks:Object.create(null),history:[],seq:0});
+ if(e.agent_name)a.name=e.agent_name;
+ if(['state','task'].includes(e.type)){a.state=e.status==='running'?'executing':e.status==='failed'?'error':e.status;if(e.summary)a.task=e.summary;a.detail=e.detail||e.summary||'';a.progress=Number.isFinite(e.progress)?e.progress:null;}
+ let delta=0;
+ if(Number.isFinite(e.documents_count))a.documents_count=e.documents_count;
+ else if(Number.isFinite(e.documents_delta))delta=e.documents_delta;
+ else if(e.type==='task'){const pending=['running','queued','pending','receiving'].includes(e.status),old=a.pending_tasks[e.subject];if(pending&&!old){a.pending_tasks[e.subject]=true;delta=2;}else if(!pending&&old){delete a.pending_tasks[e.subject];delta=-2;}}
+ else delta=['done','archived','idle'].includes(e.status)?-1:['writing','executing','researching','receiving','replying','running'].includes(e.status)?1:0;
+ a.documents_count=Math.max(0,Math.min(12,a.documents_count+delta));a.seq=e.seq;a.updated_at=e.ts;
+ a.history.push({ts:e.ts,summary:e.detail||e.summary||e.status||'资料更新'});if(a.history.length>6)a.history.shift();
+}
+function drainInbox(){
+ const pending=path.join(TOWN,'inbox','pending'),processed=path.join(TOWN,'inbox','processed');let files;
+ try{files=fs.readdirSync(pending).filter(f=>/^[a-f0-9-]{36,64}\.json$/.test(f));}catch(e){if(e.code==='ENOENT')return;throw e;}
+ const items=files.map(file=>({file,item:JSON.parse(fs.readFileSync(path.join(pending,file),'utf8'))})).sort((a,b)=>a.item.received_at.localeCompare(b.item.received_at)||(BigInt(a.item.order||0)<BigInt(b.item.order||0)?-1:1));
+ for(const {file,item}of items){
+  const e=item.event;let eventSeq=appliedInbox.get(item.id);
+  if(!eventSeq){const emitted=emit(e.source,e.type,e.subject,e.status||'',e.summary||'', '',{...e,event_id:item.id});eventSeq=emitted.seq;}
+  fs.mkdirSync(processed,{recursive:true});const target=path.join(processed,file);fs.writeFileSync(target+'.tmp',JSON.stringify({...item,seq:eventSeq}));fs.renameSync(target+'.tmp',target);fs.unlinkSync(path.join(pending,file));
+ }
+}
 
 // —— 工具 ——
 const readJsonSafe = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
@@ -75,7 +104,7 @@ function ifChanged(key, sig, makeEvent) {
 }
 
 // —— 状态归一（抄 Star-Office-UI normalize_agent_state）——
-const VALID_STATES = new Set(['idle', 'writing', 'receiving', 'replying', 'researching', 'executing', 'syncing', 'error']);
+const VALID_STATES = new Set(['idle', 'writing', 'receiving', 'replying', 'researching', 'executing', 'syncing', 'error','thinking','anxious','blocked','done']);
 function normalizeState(s) {
   if (!s) return 'idle';
   s = String(s).toLowerCase().trim();
@@ -98,7 +127,7 @@ function sampleSelfState() {
   const stale = !Number.isFinite(updated) || (Date.now() - updated) > STALE_TTL_MS;
   const working = ['writing', 'receiving', 'replying', 'researching', 'executing', 'syncing'].includes(state);
   if (stale && working) state = 'idle';
-  ifChanged('self:me', JSON.stringify([state, st.detail||'']), () => ['self', 'state', 'me', state, st.detail || '', '']);
+  ifChanged('self:me', JSON.stringify([state, st.detail||'',st.agent_name,st.progress,st.documents_count]), () => ['self', 'state', 'me', state, st.detail || '', '', {agent_id:'me',agent_name:st.agent_name||'me',progress:Number.isFinite(st.progress)?st.progress:null,...(Number.isFinite(st.documents_count)?{documents_count:st.documents_count}:{})}]);
 }
 
 // —— 采样器 ——
@@ -112,7 +141,7 @@ async function sampleDtask() {
     let status = 'running';
     const done = readJsonSafe(path.join(DTASK, id, 'done.json'));
     if (done) status = done.exit === 0 ? 'done' : (done.exit === 142 ? 'timeout' : 'failed');
-    ifChanged(`dtask:${id}`, JSON.stringify([status, meta.name||'']), () => ['dtask', 'task', id, status, meta.name || '', '']);
+    ifChanged(`dtask:${id}`, JSON.stringify([status, meta.name||'',meta.agent_id,meta.agent_name,meta.detail,meta.progress,meta.documents_count]), () => ['dtask', 'task', id, status, meta.name || '', '', {agent_id:meta.agent_id||'me',agent_name:meta.agent_name,detail:meta.detail,progress:Number.isFinite(meta.progress)?meta.progress:null,...(Number.isFinite(meta.documents_count)?{documents_count:meta.documents_count}:{})}]);
   }
 }
 
@@ -161,6 +190,7 @@ function writeSnapshot() {
     counts: { total: seq },
     now: Object.values(entities).filter(e => e.status === 'running' || e.status === 'up' || e.status === 'ok').map(e => e.subject),
     entities,
+    agents: agentRecords,
     events: history.slice(-100).reverse(),
   };
   fs.writeFileSync(SNAPSHOT + '.tmp', JSON.stringify(snap, null, 1));
@@ -168,6 +198,7 @@ function writeSnapshot() {
 }
 
 async function tick() {
+  try { drainInbox(); writeSnapshot(); } catch(e) { console.error('inbox',e.message); }
   try { sampleSelfState(); } catch (e) { console.error('selfstate', e.message); }
   try { await sampleDtask(); } catch (e) { console.error('dtask', e.message); }
   try { samplePm2(); } catch (e) { console.error('pm2', e.message); }

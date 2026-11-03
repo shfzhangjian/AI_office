@@ -3,7 +3,7 @@
 // 挂 /town 静态页 + /api/town-events（SSE 实时推 events.jsonl）+ /api/town-snapshot
 //   + /api/town-events-brief（按日回顾）+ /api/town-weather + /town-assets/*（像素素材）。
 // 可选：另挂 /api/stream/:id 把任意日志以 SSE tails 出来（清单见 LOGS / 环境变量 TOWN_LOGS）。
-// 只读：仅 GET；默认监听 127.0.0.1。
+// 读取 + 校验后的事件入队接口；默认监听 127.0.0.1。
 //
 // 关键环境变量：
 //   TOWN_DIR    数据目录（事件/快照/天气），默认 ~/ai-office-town（可指向本仓库 samples/ 直接跑）
@@ -66,8 +66,10 @@ function tail(file, n) {
   } catch { return []; }
 }
 
-const server = http.createServer((req, res) => {
+const ingest = require('./ingest').createIngest(TOWN_DIR);
+const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
+  if (await ingest(req, res, url)) return;
   if (req.method !== 'GET') { res.writeHead(405); res.end(); return; }
 
   if (url.pathname === '/') {
@@ -119,6 +121,12 @@ const server = http.createServer((req, res) => {
       .then(raw => { const data = JSON.parse(raw); res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify(data)); })
       .catch(() => { res.writeHead(503, {'Content-Type':'application/json'}); res.end('{}'); });
     return;
+  }
+  if (url.pathname === '/api/town-agents' || url.pathname === '/api/town-services') {
+    try { const snap = JSON.parse(fs.readFileSync(TOWN_SNAP));
+      const items=url.pathname.endsWith('agents') ? Object.values(snap.agents||{}) : Object.values(snap.entities||{}).filter(e=>['service','heartbeat','process'].includes(e.type));
+      res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({updated:snap.updated,items}));
+    } catch { res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Collector snapshot unavailable'})); } return;
   }
   if (url.pathname === '/api/town-snapshot') {
     try { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(fs.readFileSync(TOWN_SNAP)); }
