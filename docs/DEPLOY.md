@@ -26,7 +26,9 @@
 ```jsonc
 // town-server
 LT_PORT=3002  LT_HOST=127.0.0.1
-TOWN_DIR=~/town  WEATHER_SCRIPT=~/town/weather.sh
+TOWN_DIR=~/town  TOWN_ROSTER=~/town/roster.json
+TOWN_DEFAULT_AGENT_ID=zhangjian-1030  # 按实际旧任务归属填写
+# 不设置 TOWN_ALLOW_DEMO；若显式设置TOWN_HTML，确认其指向仓库新版
 // （素材目录不写 → 默认取仓库 frontend/assets）
 
 // town-collector
@@ -59,7 +61,7 @@ pm2 list | grep town-
 pm2 logs town-server --nostream --lines 5
 ```
 
-**秒级完成、零停机风险**：`town-server` 重启期间页面短暂 502，`autorestart` 立刻拉起；`town-collector` 重启不丢账（seq 从 `events.jsonl` 末尾续）。前端 `frontend/town.html` 和 `frontend/assets/*` 是**静态即时生效**的——改了甚至不用重启，刷新页面即可（town-server 每次请求现读文件）。
+**重启会短暂中断服务**：`town-server` 重启期间页面短暂 502，`autorestart` 立刻拉起；`town-collector` 重启不丢账（seq 从 `events.jsonl` 末尾续）。前端 `frontend/town.html` 和 `frontend/assets/*` 是**静态即时生效**的——改了甚至不用重启，刷新页面即可（town-server 每次请求现读文件）。
 
 ### 只想更新前端某处？
 改 `frontend/town.html` → 刷新浏览器，**不用重启任何进程**。
@@ -87,7 +89,7 @@ node collector/collectord.js                            # 接自己的采集源
 pm2 start <你的>/town-ecosystem.json && pm2 save
 ```
 
-依赖：Node ≥ 18（服务端零 npm 依赖）；采集器用到 `pm2 jlist`（可选，缺了自动跳过进程采集）；天气用到 `curl`+`python3`。
+依赖：Node ≥ 18（服务端零 npm 依赖）；采集器用到 `pm2 jlist`（可选，缺了自动跳过进程采集）；天气可通过 `node collector/weather.js` 周期刷新缓存；旧天气脚本仍依赖curl与python3。
 
 ---
 
@@ -130,8 +132,10 @@ curl -sk -o /dev/null -w '%{http_code}\n' https://127.0.0.1:3004/town
 # 4) 采集器没写错地方、账在长
 [ -d ~/ai-office-town ] && echo "⚠️写错目录了" || echo "✓ 写 ~/town"
 tail -1 ~/town/events.jsonl | python3 -c "import json,sys;e=json.load(sys.stdin);print('seq',e['seq'],e['ts'])"
-# 5) 页面是仓库新版（脱敏 footer 含 Simon Lee）
-curl -s http://127.0.0.1:3002/town | grep -q "Simon Lee" && echo "✓ 仓库新版页"
+# 5) 页面包含新版北京时间格式化逻辑
+curl -s http://127.0.0.1:3002/town | grep -q "beijingTime" && echo "✓ 仓库新版页"
+# 6) 核对独立角色注册与快照
+curl -s http://127.0.0.1:3002/api/town-agents
 ```
 
 ---
@@ -141,3 +145,11 @@ curl -s http://127.0.0.1:3002/town | grep -q "Simon Lee" && echo "✓ 仓库新�
 - **会随 `git pull` 更新的**：`server/town-server.js`、`collector/collectord.js`、`collector/weather.sh`、`collector/town_state.sh`、`frontend/town.html`、`frontend/assets/*`。改完这些并提交、`pm2 startOrRestart --update-env`，线上即生效。
 - **不会、也不应被仓库覆盖的**（都是本机运行态）：`~/town/events.jsonl`、`snapshot.json`、`state.json`、`weather.json`（数据/账本），`~/town/town-ecosystem.json`（本机 env），`~/.local/bin/town_state.sh`（薄包装）。仓库的 `.gitignore` 已排除这些文件名，即便误提交进 `samples/` 也不会污染。
 - 因此可以安全地 `git pull` + 重启，而不必担心丢历史事件账。
+
+## 八、新版生产展示与时间设置
+
+1. 服务端默认优先frontend/town.html，运行目录中的旧town.html不再抢占新版。检查并移除指向旧页面的TOWN_HTML显式覆盖。
+2. 不设置TOWN_ALLOW_DEMO，默认无演示模式入口；已接入数据时，旧?demo=1链接也不会切回演示。开发者显式开启演示后，实际事件到达会自动锁回真实模式。
+3. 顶部时钟、角色时间线、定时记录统一为北京时间24小时制，无需修改主机或浏览器时区，午夜显示00:00:00。
+4. 钉钉双角色必须使用同一roster配置，并确保任务带正确agent_id或机器人三元组。旧me历史不自动迁移，详见DINGTALK_MULTI_BOT.md。
+5. 历史介绍视频和旧截图属于旧版资料，当前页面外观以README最新截图为准。

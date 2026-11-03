@@ -1,253 +1,144 @@
-# 🕹️ AI Office · 我的像素办公室
+# AI Office · 多人像素办公室
 
-> 把 AI 员工一整天的**真实工作状态**，实时投影成一座会动、会下雪、会敲键盘的像素小镇。
-> 不侵入任何正在跑的服务 —— 只做旁路只读采集，账本永远在那，挂了随时能拆。
+把 AI 角色、任务日志、资料变化和服务负载映射到一间可交互的像素办公室。每位角色有独立工位与身份，支持钉钉多机器人、实时任务上报和定时任务通知。
 
-![像素办公室预览](docs/preview.png)
+![最新版办公室实际页面](docs/preview.png)
 
-演示视频（口播 + 分镜，约 1 分 40 秒）： [`video/像素办公室介绍.mp4`](video/像素办公室介绍.mp4)
+> 截图来自本地实际运行页面，使用明确标注的接入联调数据，不代表已经连接生产钉钉。生产绑定与 dsh 上报仍需按接入文档配置。
 
----
+## 当前功能
 
-## ✨ 这是什么
+- **多人角色**：角色可提前注册，闲置时保留工位；支持 6、9、12、18 个工位。
+- **办公室交互**：SVG 像素人物、显示器与键盘正确朝向、打字、思考、着急、完成、沿通道寻路、书柜查阅、咖啡桌休息和沙发手机游戏。
+- **实际数据驱动**：任务开始、日志与资料归档改变桌面纸堆；进度和服务器负载未上报时保持未知。
+- **人物详情**：点击角色后从右侧显示任务、当前步骤、时间线与来源，默认只显示地图。
+- **定时任务**：触发和结果通知、最近100次运行记录、执行角色跳转，刷新不重复弹历史通知。
+- **钉钉多机器人**：企业ID＋应用ID＋机器人编码绑定独立角色，单聊与群聊只改变来源，不根据昵称或senderId合并角色。
+- **北京时间**：页面时钟、任务时间线、定时任务记录统一使用 Asia/Shanghai、24小时制，午夜显示00时。
+- **生产界面**：默认不显示演示入口；接入任何实际事件后，即使显式开启演示，也会切回实时模式并隐藏模拟控件。
 
-打工人有一个工位，AI 员工也值得有一个。
+地图内部办公区与资料服务区按7:3组织，不再显示比例标题、底部动作样例和图例。
 
-「像素办公室 / 种田小镇」是一个**工作状态可视化仪表盘**：它把我（一个跑在本机的 AI 数字员工）的真实运行状态 —— 在写代码、在查资料、在跑后台任务、模型心跳、进程死活、外网隧道 —— 全部映射成一个小房间里一只橘猫的实时动作：
+## 快速启动
 
-| 我的真实状态 | 小镇里发生什么 |
-|---|---|
-| ✍️ writing / ⚡ executing | 橘猫坐到电脑前**敲键盘**（钳子敲动循环） |
-| 🔎 researching | 猫走到沙发边**思考** |
-| 💤 idle | 猫到床上**躺着摸鱼** |
-| ☁️ syncing / 有后台任务 | 服务器区亮起**同步动画** |
-| 🔴 error | 小屋**红色警报**闪烁 + 页面弹提示 |
-| 现实下雪 / 下雨 | 办公室内**同步飘雪 / 落雨** |
+需要 Node.js ≥18，无 npm 运行依赖。
 
-右侧「镇情快报」是一本**实时事件流水账**：每一条后台任务、每一次进程重启、每一次模型心跳变化，都按时间留底 —— 什么时候来的活、干成什么样，全部可追溯。顶部还有「昨日回顾」：昨天收成几单、枯了几苗。
+Windows PowerShell：
 
-它的定位不是玩具，而是一台**AI 员工的透明监工台**：任何人打开网页，就能看到这个 AI 此刻在干嘛、系统哪个部件挂了、今天交付了什么。
-
----
-
-## 🏗️ 架构：三层，纯旁路
-
-```
-        ┌─────────────────────────────────────────────┐
-        │  采集层  collector/collectord.js  (pm2 常驻)   │
-        │  每 5s 只读扫一遍：任务目录 / 进程表 / 模型端口  │
-        │  / 守护日志 / 隧道日志；状态【变化才】落一条事件 │
-        └───────────────┬─────────────────────────────┘
-                        │  events.jsonl (事件底账,单调 seq)
-                        │  snapshot.json (首屏快照)
-        ┌───────────────▼─────────────────────────────┐
-        │  总线层  server/town-server.js  (零依赖 Node)  │
-        │  /town 静态页 · /api/town-events SSE 实时推    │
-        │  /api/town-snapshot · /api/town-events-brief  │
-        └───────────────┬─────────────────────────────┘
-                        │  Server-Sent Events
-        ┌───────────────▼─────────────────────────────┐
-        │  渲染层  frontend/town.html  (纯 Canvas 网页)  │
-        │  八态状态机 → 精灵动画 + 走路插值 + 天气同步     │
-        └───────────────────────────────────────────────┘
-```
-
-设计原则，刻在骨子里的三条：
-
-1. **零侵入**：采集器只 `readdir` / `pm2 jlist` / TCP 探活 / 读日志尾部，**从不写、不碰任何被监控的服务**。挂了直接 `pm2 delete`，被监控方毫发无损。
-2. **文件即总线**：状态用 `state.json`、事件用 `events.jsonl` 传递。没有数据库、没有消息队列、没有 RPC —— 一个文件就是一个组件的接口，谁都能独立重启、独立替换。
-3. **只在变化时记账**：采集器对每个源记 `signature`，状态没变就什么都不写。一天下来账本只有几十条有效事件，而不是一坨心跳噪音。
-
-### 八个工作状态（状态机）
-
-`idle` · `writing` · `receiving` · `replying` · `researching` · `executing` · `syncing` · `error`
-
-自报状态通过一条命令完成（`working` / `running` 等同义词会自动归一）：
-
-```bash
-collector/town_state.sh writing "正在写 README"
-```
-
-`state.json` 带 `updated_at`，采集器对「工作中」状态设 **10 分钟 TTL**：超过 10 分钟没心跳自动回落 `idle`，杜绝"假工作中"。
-
----
-
-## 🚀 快速开始（30 秒跑起来）
-
-需要 **Node.js ≥ 18**（仅用内置模块，服务端零 npm 依赖）。仓库自带 `samples/` 假数据，clone 即用：
-
-```bash
-# 终端 1：起小镇服务（把数据目录指向仓库自带的示例）
-TOWN_DIR=$(pwd)/samples node server/town-server.js
-# → http://127.0.0.1:3002/town
-
-# 终端 2（可选）：接你自己的采集器
-node collector/collectord.js
-```
-
-打开 `http://127.0.0.1:3002/town` 就能看到上面那张图。玩状态机：
-
-```bash
-export TOWN_DIR=$(pwd)/samples
-collector/town_state.sh researching "翻资料"   # 猫去沙发思考
-collector/town_state.sh writing "敲键盘中"      # 猫回电脑敲键盘
-```
-
-> ⚠️ 直接对 `samples/` 跑 `collectord.js` 会往示例文件里追加真实采集事件。想保持示例干净，
-> 先 `cp -r samples ~/ai-office-town` 再用默认路径。
-
-### 接你自己的数据
-
-采集器所有采集源都用环境变量声明，**缺哪个源就自动跳过哪个，不报错**：
-
-| 环境变量 | 作用 | 默认 |
-|---|---|---|
-| `TOWN_DIR` | 数据目录（事件 / 快照 / 状态 / 天气） | `~/ai-office-town` |
-| `DTASK_DIR` | 后台任务目录（每个子目录含 `meta.json`〔+`done.json`〕即一个任务） | `~/.ai-office/dtask/tasks` |
-| `HB_PORTS` | 心跳探活清单，格式 `名称:端口,名称:端口` | `local-llm:11234,app:3080,panel:3000` |
-| `GUARD_LOG` | 进程守护日志（捕捉 restart/恢复） | `~/.ai-office/guard.log` |
-| `TUNNEL_LOG` | cloudflared 隧道日志（捕捉外网域名变化） | `/tmp/town-tunnel.log` |
-| `COLLECTOR_INTERVAL_MS` | 采集间隔 | `5000` |
-
-事件流水 `events.jsonl` 每行一条 JSON（采集器保证 `seq` 单调）：
-
-```jsonc
-{"seq":12,"ts":"2026-11-03T01:49:44.831Z","source":"dtask","type":"task",
- "subject":"report-gen","status":"done","summary":"生成周报","link":""}
-```
-
-`source` 是来源类别、`type` 是 `task|state|heartbeat|process|note|cloudflared`、`status` 决定前端配色（`done/up/ok`=绿，`running`=蓝，`failed/down/timeout`=红，`warn`=黄）。
-
----
-
-## 📁 目录结构
-
-```
-AI_office/
-├── server/town-server.js     只读服务：/town 页 + SSE 事件 + 快照 + 天气 + 素材（零 npm 依赖）
-├── collector/
-│   ├── collectord.js         旁路采集器（pm2 常驻）
-│   ├── town_state.sh         一条命令改自报状态（八态状态机）
-│   └── weather.sh            open-meteo 天气旁路，缓存 15 分钟
-├── frontend/
-│   ├── town.html             像素小镇本体（Canvas 渲染 + 事件流 + 状态名牌）
-│   └── assets/               像素美术素材（见下方授权，非商用）
-├── video/                    口播演示视频成片 + 可复现的合成脚本（见 docs/VIDEO.md）
-├── docs/                     本文档配图、预览图、架构说明
-├── samples/                  可直接跑的示例事件数据
-└── LICENSE                   代码 MIT / 素材非商用（双授权，务必阅读）
-```
-
-### 事件流接口（前端用的）
-
-| 路由 | 说明 |
-|---|---|
-| `GET /town` | 小镇页面 |
-| `GET /api/town-events?after=<seq>` | SSE 实时事件流（首屏全量回放，之后增量） |
-| `GET /api/town-snapshot` | 当前快照（页面首屏直接读，不阻塞） |
-| `GET /api/town-events-brief?day=yesterday` | 按北京时间的当日回顾统计 |
-| `GET /api/town-weather` | open-meteo 实时天气（供现实同步飘雪） |
-| `GET /town-assets/<file>` | 像素素材静态资源（防目录穿越） |
-
----
-
-## 🎬 关于演示视频
-
-`video/` 里不只是成片，还有**完整可复现的合成流水线**：分段 edge-tts 口播 → 用无头浏览器按状态截帧 → PIL 生成整屏字幕带 → ffmpeg 分段 overlay + concat。本机 ffmpeg 缺 `subtitles/ass/drawtext` 滤镜，所以字幕走「PIL 整屏字幕带 + overlay」而不是 `ass` 滤镜。详细步骤与踩坑见 [`docs/VIDEO.md`](docs/VIDEO.md)。
-
-页面里留了演示钩子 `window.demo(x,y,z)`（镜头缩放平移）和 `setSelf(state, detail)`（切状态），录视频时直接调。
-
----
-
-## 🧭 可扩展方向
-
-- **常驻部署 / 按仓库更新线上**：本仓库就是我这套正在跑的系统唯一的代码源，pm2 两个进程（`town-server` / `town-collector`）+ 一份 ecosystem 用环境变量桥接数据目录。日常 `git pull && pm2 startOrRestart ~/town/town-ecosystem.json --update-env` 即上线。全过程见 [`docs/DEPLOY.md`](docs/DEPLOY.md)。
-- **加建筑**：`collectord.js` 加一个 `tcpProbe(port)` 采集器 → `town.html` 加一个 `<g id>` 建筑节点 → 重启两个进程，新建筑下个 tick 自动点亮。三步指南见 [`docs/我开口记账.md`](docs/我开口记账.md)。
-- **换皮**：删掉 `frontend/assets/`，接你自己的原创像素素材即可（代码不认素材内容，只认精灵图网格尺寸）。
-- **加状态**：八态想扩到更多，改 `collectord.js` 的 `normalizeState` + `town.html` 的 `AREAS/ANIM_OF/STATE_LABEL` 三处映射即可。
-- **外网监工**：`cloudflared tunnel --url http://127.0.0.1:3002` 一条命令拿到临时公网域名，手机随时来看 AI 干活。
-
----
-
-## 📄 授权（务必阅读）
-
-本仓库**双授权**：
-
-- **代码 / 逻辑**（`server/` `collector/` `video/` `docs/` 中我编写的部分 + `frontend/town.html` 的渲染逻辑）：**MIT**，随便用、随便改、可商用。
-- **像素美术素材**（`frontend/assets/*.png|*.webp`）：来自开源项目 [Star-Office-UI](https://github.com/ringhyacinth/Star-Office-UI)（Ring Hyacinth & Simon Lee），**仅限学习 / 演示 / 分享，禁止商用**；Guest 角色使用 [LimeZu](https://limezu.itch.io/animated-mini-characters-2-platform-free) 的免费素材。要商用请把素材整体替换成你自己的原创美术，MIT 代码不受影响。
-
-完整条款见 [`LICENSE`](LICENSE) 与 [`frontend/assets/LICENSE-Star-Office-UI.txt`](frontend/assets/LICENSE-Star-Office-UI.txt)。
-
----
-
-*状态管道：collectord + SSE · 事件底账：`TOWN_DIR/events.jsonl` · 一只敲键盘的橘猫，替你盯着这台机器。*
-
-## 2026-11-03 更新
-
-修复动画加速、角色映射、事件完整性和状态恢复问题，详见 [CHANGELOG.md](CHANGELOG.md)。
-
-Windows PowerShell 示例：
 ```powershell
-$env:TOWN_DIR = Join-Path $PWD samples
-node server/town-server.js
+git clone https://github.com/shfzhangjian/AI_office.git
+Set-Location AI_office
+$env:TOWN_DIR = Join-Path $env:USERPROFILE 'ai-office-town'
+$env:LT_PORT = '3002'
+node server/start.js
 ```
 
-天气接口现在只读取缓存，请使用系统定时任务每 15 分钟运行 `node collector/weather.js`；首次可手动运行一次。旧 weather.sh 仍可更新同一缓存。缺少缓存时页面显示天气暂不可用。状态脚本需要 Bash/Python（Windows 可通过 WSL 使用）。
+Linux/macOS：
 
-事件账本由单个采集器独占写入；外部程序应写 state.json，禁止直接追加 seq=0 事件。公网分享请在隧道入口配置身份验证。素材授权保持原样。
+```bash
+git clone https://github.com/shfzhangjian/AI_office.git
+cd AI_office
+TOWN_DIR="$HOME/ai-office-town" LT_PORT=3002 node server/start.js
+```
 
-### 自绘橘猫角色
+打开 http://127.0.0.1:3002/town 。统一入口同时启动网页和采集器；同一个TOWN_DIR只允许一个采集器。无角色数据时地图保留空工位，不自动填入假人物。
 
-当前工作角色使用 `frontend/assets/office-cat-*.svg`，为项目自绘几何像素风 SVG，按 MIT 授权，无龙虾钳造型。支持待命眨眼、左右爪打字与移动起伏；八种工作状态保持同一角色。房间与其他既有装饰素材仍遵循原非商用条款，替换角色不代表全部素材可商用。
+## 接入文档
 
-## 多人办公室（新版）
+| 文档 | 内容 |
+|---|---|
+| [通用事件接口](docs/API.md) | 角色状态、任务、资料、服务负载、鉴权、幂等回执与上报示例 |
+| [钉钉多机器人](docs/DINGTALK_MULTI_BOT.md) | 两角色注册、机器人绑定、dsh接入位置、默认me迁移边界 |
+| [定时任务接入与实现](docs/SCHEDULE_INTEGRATION.md) | 生命周期通知、包装器、cron、Windows任务计划、排障 |
+| [部署与运行](docs/DEPLOY.md) | 既有PM2部署，以及新版页面、天气和演示策略说明 |
+| [更新记录](CHANGELOG.md) | 按版本说明功能、验证与限制 |
 
-打开 `/town`：地图左侧 70% 为办公区，右侧 30% 为资料与服务区。工位支持 6/9/12/18 个，新增人物按空工位分配；点击人物查看任务与时间线。旧版页面存档于 `frontend/town-legacy.html`。
+### 两个钉钉角色先注册再接入
 
-- 默认实时模式；点击“演示模式”查看六位人物、查资料、沙发休息和三种模拟服务器负载。
-- 四邻接网格寻路绕过家具与分隔墙，通过门口进入资料室；人物闲置后会沿通道散步或去沙发休息。
-- 原创 SVG 像素人，不再加载动物角色。工位人物隐藏身体，露出头部；打字动作显示在键盘位置。
-- 状态支持 writing/executing/replying（打字）、thinking（思考）、anxious（着急）、blocked（为难）、done（开心）、idle（等待）、researching（前往书柜）、error（异常）。现有采集器的八种状态继续兼容。
-- 多人物状态事件以 `subject` 为角色标识；任务事件可带 `agent_id`、`agent_name`，否则归属 me。可选 `progress`（0–100）与 `detail` 更新详情；未上报进度显示未知。
-- 服务事件支持 `type: service`、`subject`、`status` 和可选 `load`（0–100）；81% 以上显示蒸汽。现有 TCP 探活只展示在线状态，不会伪造 CPU 负载。目前地图显示前 3 个服务。
-- 演示模式不会污染真实事件；真实模式不会编造工作进度或负载。
+复制并修改 [config/roster.example.json](config/roster.example.json)，放到运行目录roster.json。示例中的企业ID、应用ID和1030机器人编码是占位符，必须填写真实配置；不填写appSecret或accessToken。
 
-验证：`node --test tests/*.test.js`。新版无需外部素材、构建工具和网络字体。
+```powershell
+$env:TOWN_ROSTER = Join-Path $env:TOWN_DIR 'roster.json'
+$env:TOWN_DEFAULT_AGENT_ID = 'zhangjian-1030'
+node server/start.js
+```
 
-### 地图展示与视觉校准
+默认角色只用于明确属于1030的旧state.json/任务。虚拟机任务必须提供独立agent_id或完整机器人三元组，不能把全部任务继续交给默认角色。
 
-- 默认只显示地图；不再展示分区比例标题、动画样例、底部图例和常驻详情栏。
-- 点击人物后右侧浮层展示任务，点击关闭或按 Escape 收起；收起后地图保持完整宽度。
-- 电脑朝向与人物座位一致：观众看到显示器背壳，人物在显示器后方，仅头部露出；打字手位在桌面键盘处。
-- `http://127.0.0.1:3012/town?demo=1` 可直接进入模拟预览（端口随部署变化）；默认 `/town` 仍展示真实数据。
-- 真实浏览器截图见 [docs/office-map-first.png](docs/office-map-first.png)。
+新增钉钉接口是可信dsh桥接进程的业务上报入口，**不是钉钉原始Webhook回调**。本仓库不负责钉钉登录、Stream建连、回调验签或消息发送，也不会凭空修复钉钉客户端的发送者显示。线上dsh源码不在本仓库，需在该程序的任务流程中接入上报。
 
-### 咖啡桌与手机休息
+### 接口一览
 
-闲置角色现在会在散步、沙发与咖啡桌间选择休息；沙发可播放手机游戏动作，咖啡桌支持持杯和蒸汽。演示模式点击闲置角色，在右侧选择“去咖啡桌”或“沙发玩手机”即可手动预览。休息动作是地图可视化行为，不表示真实人物正在玩游戏。
+| 方法 | 路径 | 用途 |
+|---|---|---|
+| POST | /api/town-events | 通用角色注册、状态、任务、资料、服务、定时任务上报 |
+| POST | /api/town-dingtalk/events | 经过机器人身份绑定的可信桥接上报 |
+| GET | /api/town-inbox/:id | 查询queued/applied与seq |
+| GET | /api/town-agents | 查询完整角色投影 |
+| GET | /api/town-dingtalk/bindings | 查询当前角色与机器人绑定，不返回密钥 |
+| GET | /api/town-services | 服务状态与负载 |
+| GET | /api/town-schedules | 最近100次定时运行 |
+| GET | /api/town-snapshot | 首屏与重连快照 |
+| GET | /api/town-events?after=seq | SSE增量事件 |
 
-### 工位朝向与日志资料
+POST返回202表示持久化入队，不等于业务执行成功。采集器处理后通过快照和SSE更新页面。
 
-从房间后方向观众方向依次为人物、键盘、显示器背壳、桌沿；键盘和打字手位在操作者一侧。
+## 环境配置
 
-桌面纸张由每位角色的事件独立驱动：工作/资料日志增加，新任务增加，完成或归档减少。任务状态使用任务 subject 去重，同一序号回放不重复增加。`document`/`log`/`note` 事件可带 `agent_id` 和 `documents_count`（绝对数量）或 `documents_delta`（增减数量）；范围限制 0–12，纸堆最多显示 8 层。未提供数量时仅作为日志活动的视觉映射，不代表真实文档统计。刷新后从可用快照与事件恢复，完整精确数量应由上游显式上报。
+| 变量 | 用途 | 默认 |
+|---|---|---|
+| TOWN_DIR | 事件、快照、状态和队列目录 | 用户主目录/ai-office-town |
+| LT_HOST / LT_PORT | 监听地址与端口 | 127.0.0.1 / 3002 |
+| TOWN_ROSTER | 角色注册与机器人绑定文件 | TOWN_DIR/roster.json |
+| TOWN_DEFAULT_AGENT_ID | 旧文件任务的明确默认角色 | 无注册表时兼容me；有注册表时需明确归属 |
+| TOWN_WRITE_TOKEN | HTTP写入令牌 | 未设置时仅允许回环来源写入 |
+| COLLECTOR_INTERVAL_MS | 采集周期 | 5000 |
+| DTASK_DIR | 后台任务目录 | ~/.ai-office/dtask/tasks |
+| HB_PORTS | TCP探活，名称:端口逗号分隔 | local-llm:11234,app:3080,panel:3000 |
+| TOWN_HTML | 显式指定页面文件 | 优先使用仓库frontend/town.html |
+| TOWN_ALLOW_DEMO | 开发时显式开启空数据演示 | 关闭，只有1开启；实际数据到达后关闭 |
 
-演示模式每 3.5 秒产生一条明确标注的模拟资料日志，展示纸堆增减，暂停动画时同时暂停模拟更新；实时模式不进行随机或定时增减。
+生产部署不设置TOWN_ALLOW_DEMO。旧 `?demo=1` 不会在默认部署中开启演示，也不能覆盖已经接入的实际数据。服务重启后读取此环境设置。
 
-## 接入真实接口
+页面时间与浏览器、服务器操作系统时区无关。API时间戳推荐使用带Z或偏移的ISO8601；账本可保留UTC，页面统一转换到北京时间。
 
-现在支持 `POST /api/town-events` 上报多角色状态、任务、资料变化和服务负载；使用 `node server/start.js` 同时启动网页与采集器。完整请求示例、鉴权、回执与运行方式见 [docs/API.md](docs/API.md)。上报工具：`node collector/report.js event.json`。
+## 数据与运行原则
 
-## 定时任务触发通知
+```text
+可信桥接/业务程序 → HTTP校验 → inbox持久化队列
+                                  ↓
+文件采集源 ──────────────→ 单个collector → events.jsonl
+                                              ↓
+                                      角色/运行快照 + SSE
+                                              ↓
+                                      SVG办公室实时页面
+```
 
-工具栏“定时任务”可查看最近100次运行；新触发及完成/失败会显示通知，刷新仅恢复记录不重复弹窗。现有调度器可用 `collector/run-scheduled.js` 包装原命令，或通过统一接口发送 `type: schedule` 生命周期事件。
+- 采集器不修改被监控的服务，网页接口只把上报事件写入队列。
+- seq、event_id、幂等键与完整角色投影负责去重和恢复；历史me事件不会自动猜测迁移。
+- TCP探活不等于CPU负载。负载、进度及精确资料计数需上游明确提供。
+- 咖啡与手机游戏是闲置可视化行为，不表示真实用户正在休息或游戏。
+- 角色退役、历史账本/回执清理、多采集器并发不在当前实现范围。
+- 远程写入配置TOWN_WRITE_TOKEN及HTTPS入口；读取接口也应由入口配置访问控制，密钥不要放入前端。
 
-详细文档：[定时任务接入与实现](docs/SCHEDULE_INTEGRATION.md)，包含协议、幂等重试、cron/Windows示例、角色联动、时区、验收和排障。项目展示上游调度事件，不自行创建系统定时任务。
+## 测试与截图
 
-## 钉钉多机器人角色隔离
+```bash
+node --test tests/*.test.js
+```
 
-新增角色注册与 roster.json 绑定：企业ID＋应用ID＋robot_code 精确映射到独立 agent_id。两个机器人在同群或单聊中保持不同工位，昵称或 senderId 相同也不会合并。角色闲置时仍保留；旧 state.json 与任务元数据支持显式默认角色，多角色状态可写到 agents/<角色ID>.json。
+测试覆盖身份隔离、入队与幂等、状态恢复、资料增减、寻路、定时任务、包装器退出码、北京时间与演示数据隔离。
 
-可信桥接接口：`POST /api/town-dingtalk/events`；只读绑定查询：`GET /api/town-dingtalk/bindings`。示例配置：[config/roster.example.json](config/roster.example.json)。完整接入与迁移说明：[docs/DINGTALK_MULTI_BOT.md](docs/DINGTALK_MULTI_BOT.md)。
+最新版实际截图：
 
-注意：此接口供已认证的dsh/任务桥接进程调用，不是钉钉原始Webhook接收地址；本仓库没有线上dsh发送器源码，不会改变钉钉发送者显示。生产接入需补齐真实企业/应用/1030机器人编码，并修改桥接上报点。
+- [办公室地图](docs/preview.png)
+- [人物详情与北京时间](docs/office-latest-detail.png)
+- [定时任务运行记录](docs/office-latest-schedules.png)
+
+截图中联调任务均为测试上报；旧截图保留在docs用于历史对照，不再作为当前主预览。
+
+## 授权与历史资料
+
+新版地图、人物及家具由项目SVG代码绘制，代码遵循仓库MIT条款。仓库保留的旧版PNG/WebP素材仍受其原非商用授权约束，不能因新版页面不使用它们就认为全部文件可商用。详见 [LICENSE](LICENSE)。
+
+[介绍视频](video/像素办公室介绍.mp4)和[视频制作说明](docs/VIDEO.md)展示历史版本，不代表当前多人界面；旧Canvas页面存档为frontend/town-legacy.html。

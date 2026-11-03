@@ -108,3 +108,11 @@ node collector/report.js event.json
 ## 多角色注册与钉钉适配
 
 `POST /api/town-events` 支持 `type: agent`、`status: registered`、角色subject与agent_name，用于提前注册闲置人物。钉钉来源请使用 `POST /api/town-dingtalk/events`，以注册表三元组进行严格角色绑定；查询接口为 `GET /api/town-dingtalk/bindings`。完整协议与线上桥接迁移步骤见 [DINGTALK_MULTI_BOT.md](DINGTALK_MULTI_BOT.md)。
+
+## 生产界面与时间显示（2026-11-03）
+
+页面时钟、实时任务时间线、刷新恢复的时间线及定时任务记录，统一按 `Asia/Shanghai` 展示为24小时制；午夜为00时，与浏览器/服务器本地时区无关。API与账本保留带时区ISO8601，不通过修改系统时区或把UTC字符串错误拼接成北京时间来转换。
+
+默认部署关闭所有演示入口，包括添加演示人物、休息演示操作和定时任务模拟触发。`?demo=1`不能绕过默认配置。只有开发环境显式设置 `TOWN_ALLOW_DEMO=1` 且尚无实际事件时可使用模拟预览；一旦快照或SSE包含实际上报，自动清除演示角色/服务/通知，切回真实数据，隐藏模拟控件。本页会话不能再次切回演示；刷新后仍按实际快照锁定。生产环境不要配置此变量。
+
+页面默认优先使用仓库frontend/town.html，运行目录里旧town.html不再覆盖新版；如果显式设置过TOWN_HTML，部署时应移除旧覆盖或指向新版。

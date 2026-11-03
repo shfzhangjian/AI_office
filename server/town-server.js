@@ -21,7 +21,7 @@ const TOWN_DIR = process.env.TOWN_DIR || path.join(require('os').homedir(), 'ai-
 // 前端目录：本仓库里 server/ 与 frontend/ 平级
 const FRONTEND = process.env.TOWN_FRONTEND || path.join(__dirname, '..', 'frontend');
 
-const TOWN_FILES = [process.env.TOWN_HTML, path.join(TOWN_DIR, 'town.html'), path.join(FRONTEND, 'town.html')].filter(Boolean);
+const TOWN_FILES = [process.env.TOWN_HTML, path.join(FRONTEND, 'town.html'), path.join(TOWN_DIR, 'town.html')].filter(Boolean);
 const TOWN_EVENTS = path.join(TOWN_DIR, 'events.jsonl');
 const TOWN_SNAP = path.join(TOWN_DIR, 'snapshot.json');
 const TOWN_ASSETS = process.env.TOWN_ASSETS || path.join(FRONTEND, 'assets');
@@ -96,7 +96,7 @@ const server = http.createServer(async (req, res) => {
     const f = TOWN_FILES.find(x => { try { return fs.statSync(x).isFile(); } catch { return false; } });
     if (!f) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('town.html 未找到'); return; }
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(fs.readFileSync(f)); return;
+    const html=fs.readFileSync(f,'utf8');const config=JSON.stringify({allow_demo:process.env.TOWN_ALLOW_DEMO==='1'});res.end(html.replace('<script>','<script>window.OFFICE_CONFIG='+config+';</script><script>')); return;
   }
   if (url.pathname === '/api/town-events-brief') {
     // 按北京时间统计某日事件（day=yesterday|today），只回统计相关字段

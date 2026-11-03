@@ -5,8 +5,10 @@ test('HTTP ingestion persists, validates and deduplicates; collector projects re
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'office-api-')),port=19383;
  const child=spawn(process.execPath,[path.join(__dirname,'../server/town-server.js')],{env:{...process.env,TOWN_DIR:dir,LT_PORT:String(port),TOWN_WRITE_TOKEN:'local-test-token'},stdio:['ignore','pipe','pipe']});
  const base='http://127.0.0.1:'+port;
+ fs.writeFileSync(path.join(dir,'town.html'),'<h1>legacy-data-directory-page</h1>');
  try{
  await new Promise((resolve,reject)=>{child.stdout.once('data',resolve);child.once('error',reject);setTimeout(()=>reject(Error('startup timeout')),5000).unref()});
+ const html=await(await fetch(base+'/town')).text();assert.ok(html.includes('window.OFFICE_CONFIG={"allow_demo":false}'));assert.ok(!html.includes('legacy-data-directory-page'));
  const send=(data,key,auth=true)=>fetch(base+'/api/town-events',{method:'POST',headers:{'Content-Type':'application/json',...(auth?{Authorization:'Bearer local-test-token'}:{}),...(key?{'Idempotency-Key':key}:{})},body:JSON.stringify(data)});
  const state={type:'state',subject:'alice',agent_name:'林舟',status:'writing',summary:'处理真实任务',documents_count:4};
  assert.equal((await send(state,'state',false)).status,401);
