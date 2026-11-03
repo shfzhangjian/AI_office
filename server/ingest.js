@@ -1,12 +1,12 @@
 'use strict';
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const STATES=new Set(['idle','writing','receiving','replying','researching','executing','syncing','error','thinking','anxious','blocked','done']);
-const TYPES=new Set(['state','task','document','log','service']);
+const TYPES=new Set(['state','task','document','log','service','schedule']);
 function validate(input){
  if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Expected a JSON object');
- if(!TYPES.has(input.type))throw Error('type must be state, task, document, log or service');
+ if(!TYPES.has(input.type))throw Error('type must be state, task, document, log, service or schedule');
  const out={type:input.type,source:'api'};
- for(const [key,max] of Object.entries({subject:100,agent_id:100,agent_name:80,status:40,summary:2000,detail:4000})){
+ for(const [key,max] of Object.entries({subject:100,agent_id:100,agent_name:80,status:40,summary:2000,detail:4000,run_id:100,job_name:160,scheduler:80,scheduled_for:40,started_at:40,finished_at:40,timezone:80})){
   if(input[key]!==undefined){if(typeof input[key]!=='string'||input[key].length>max||/[\u0000-\u0008]/.test(input[key]))throw Error('Invalid '+key);out[key]=input[key];}
  }
  if(!out.subject||!out.subject.trim())throw Error('subject is required');
@@ -16,6 +16,12 @@ function validate(input){
  if(input.type==='service'&&!['up','down','unknown'].includes(out.status))throw Error('Invalid service status');
  for(const [key,min,max,integer] of [['progress',0,100,false],['load',0,100,false],['documents_count',0,12,true],['documents_delta',-12,12,true]]){
   if(input[key]!==undefined){const n=input[key];if(typeof n!=='number'||!Number.isFinite(n)||n<min||n>max||(integer&&!Number.isInteger(n)))throw Error('Invalid '+key);out[key]=n;}
+ }
+ if(input.type==='schedule'){
+  if(!out.run_id||!out.run_id.trim())throw Error('schedule requires run_id');
+  if(!['triggered','running','done','failed','missed'].includes(out.status))throw Error('Invalid schedule status');
+  for(const field of ['scheduled_for','started_at','finished_at'])if(out[field]!==undefined&&(!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(out[field])||!Number.isFinite(Date.parse(out[field]))))throw Error(field+' must be an ISO timestamp with timezone');
+  if(out.timezone!==undefined){try{new Intl.DateTimeFormat('en',{timeZone:out.timezone})}catch{throw Error('Invalid timezone')}}
  }
  if(out.documents_count!==undefined&&out.documents_delta!==undefined)throw Error('Send documents_count or documents_delta, not both');
  if(input.type==='document'&&out.documents_count===undefined&&out.documents_delta===undefined)throw Error('document requires documents_count or documents_delta');

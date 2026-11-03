@@ -236,3 +236,9 @@ node server/town-server.js
 ## 接入真实接口
 
 现在支持 `POST /api/town-events` 上报多角色状态、任务、资料变化和服务负载；使用 `node server/start.js` 同时启动网页与采集器。完整请求示例、鉴权、回执与运行方式见 [docs/API.md](docs/API.md)。上报工具：`node collector/report.js event.json`。
+
+## 定时任务触发通知
+
+工具栏“定时任务”可查看最近100次运行；新触发及完成/失败会显示通知，刷新仅恢复记录不重复弹窗。现有调度器可用 `collector/run-scheduled.js` 包装原命令，或通过统一接口发送 `type: schedule` 生命周期事件。
+
+详细文档：[定时任务接入与实现](docs/SCHEDULE_INTEGRATION.md)，包含协议、幂等重试、cron/Windows示例、角色联动、时区、验收和排障。项目展示上游调度事件，不自行创建系统定时任务。

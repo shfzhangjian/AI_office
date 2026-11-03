@@ -31,6 +31,7 @@ const history = [];
 const entities = {};
 const agentRecords = Object.create(null);
 const appliedInbox = new Map();
+const scheduleRuns = new Map();
 try {
   for (const line of fs.readFileSync(EVENTS, 'utf8').split('\n')) {
     try { const e = JSON.parse(line); if (!Number.isSafeInteger(e.seq) || e.seq <= 0) continue; seq = Math.max(seq, e.seq); history.push(e); entities[`${e.source}:${e.subject}`] = e; projectAgent(e); if(e.event_id)appliedInbox.set(e.event_id,e.seq); } catch {}
@@ -51,6 +52,13 @@ const emit = (source, type, subject, status, summary, link, extra = {}) => {
 
 // Rebuild complete per-agent projections from the durable ledger, including documents.
 function projectAgent(e){
+ if(e.type==='schedule'){
+  const previous=scheduleRuns.get(e.run_id);if(!previous||!['done','failed','missed'].includes(previous.status)||['done','failed','missed'].includes(e.status)){
+   scheduleRuns.set(e.run_id,{...previous,...e,triggered_at:previous?.triggered_at||(e.status==='triggered'?e.ts:null)});
+   if(scheduleRuns.size>100)scheduleRuns.delete(scheduleRuns.keys().next().value);
+  }return;
+ }
+
  if(!['state','task','document','log'].includes(e.type))return;
  const id=String(e.agent_id||(e.type==='state'?e.subject:'me'));
  const a=agentRecords[id]||(agentRecords[id]={id,name:e.agent_name||id,state:'idle',task:'',detail:'',progress:null,documents_count:0,pending_tasks:Object.create(null),history:[],seq:0});
@@ -191,6 +199,7 @@ function writeSnapshot() {
     now: Object.values(entities).filter(e => e.status === 'running' || e.status === 'up' || e.status === 'ok').map(e => e.subject),
     entities,
     agents: agentRecords,
+    schedules: [...scheduleRuns.values()].sort((a,b)=>b.seq-a.seq),
     events: history.slice(-100).reverse(),
   };
   fs.writeFileSync(SNAPSHOT + '.tmp', JSON.stringify(snap, null, 1));

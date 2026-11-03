@@ -98,3 +98,9 @@ node collector/report.js event.json
 角色完整状态与资料计数从事件账本重建，快照用于首屏初始化；刷新不会重复增减纸张。队列、处理回执及 events.jsonl 属于运行时数据，需按部署容量规划保留期限。当前不含回执清理策略，不支持多个采集器同时写同一目录。
 
 当前页面的“接口联调”角色和“接口测试服务”为明确标注的联调测试上报，不代表已连接某个未指定的生产 AI 服务。
+
+## 定时任务扩展
+
+统一上报接口增加 `type: schedule`，支持 triggered/running/done/failed/missed，必须提供任务 subject 与每次执行唯一的 run_id。`GET /api/town-schedules` 查询最近100次运行，快照包含 schedules 数组。界面会提示新触发与执行结果，刷新时不回放历史弹窗。
+
+完整实现说明、字段、调用和调度器接入参见 [SCHEDULE_INTEGRATION.md](SCHEDULE_INTEGRATION.md)。
