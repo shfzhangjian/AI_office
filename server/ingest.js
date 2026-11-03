@@ -6,10 +6,11 @@ function validate(input){
  if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Expected a JSON object');
  if(!TYPES.has(input.type))throw Error('type must be state, task, document, log, service, schedule or agent');
  const out={type:input.type,source:'api'};
- for(const [key,max] of Object.entries({subject:100,agent_id:100,agent_name:80,status:40,summary:2000,detail:4000,run_id:100,job_name:160,scheduler:80,scheduled_for:40,started_at:40,finished_at:40,timezone:80,provider:40,tenant_id:150,app_id:150,robot_code:150,conversation_type:20,conversation_id:200,external_subject:200,executor_id:100})){
+ for(const [key,max] of Object.entries({subject:100,agent_id:100,agent_name:80,status:40,summary:2000,detail:4000,run_id:100,job_name:160,scheduler:80,scheduled_for:40,started_at:40,finished_at:40,timezone:80,provider:40,tenant_id:150,app_id:150,robot_code:150,conversation_type:20,conversation_id:200,external_subject:200,executor_id:100,message_phase:20,content:8000,task_id:100,message_id:200,delivery_status:20})){
   if(input[key]!==undefined){if(typeof input[key]!=='string'||input[key].length>max||/[\u0000-\u0008]/.test(input[key]))throw Error('Invalid '+key);out[key]=input[key];}
  }
  if(!out.subject||!out.subject.trim())throw Error('subject is required');
+ if(out.message_phase!==undefined){if(!['received','execution','reply'].includes(out.message_phase))throw Error('Invalid message_phase');if(!out.task_id||!out.conversation_id||!out.conversation_type||!out.content)throw Error('message_phase requires task_id, conversation_id, conversation_type and content');if(!['direct','group'].includes(out.conversation_type))throw Error('Invalid conversation_type');if(out.message_phase==='reply'&&!['sent','failed'].includes(out.delivery_status))throw Error('reply requires delivery_status sent or failed');if(!['log','task'].includes(out.type))throw Error('message_phase requires log or task event');}
  if(input.type==='agent'){if(out.status!=='registered'||!out.agent_name)throw Error('agent registration requires registered status and agent_name');out.agent_id=out.subject;}
  if(input.type==='state'){if(!STATES.has(out.status))throw Error('Invalid agent status');out.agent_id=out.subject;}
  if(input.type==='task'){if(!out.agent_id)throw Error('task requires agent_id');if(!['queued','pending','running','done','failed','timeout','archived'].includes(out.status))throw Error('Invalid task status');}

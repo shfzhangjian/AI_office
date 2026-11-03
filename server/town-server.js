@@ -86,8 +86,8 @@ const server = http.createServer(async (req, res) => {
     const f = path.join(TOWN_ASSETS, name);
     try {
       const st = fs.statSync(f);
-      const mime = { '.webp': 'image/webp', '.png': 'image/png', '.txt': 'text/plain', '.svg': 'image/svg+xml' }[path.extname(name)] || 'application/octet-stream';
-      res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=86400' });
+      const mime = { '.webp': 'image/webp', '.png': 'image/png', '.txt': 'text/plain', '.svg': 'image/svg+xml', '.js':'text/javascript; charset=utf-8' }[path.extname(name)] || 'application/octet-stream';
+      res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': path.extname(name)==='.js'?'no-cache':'public, max-age=86400' });
       fs.createReadStream(f).pipe(res);
     } catch { res.writeHead(404); res.end('nf'); }
     return;

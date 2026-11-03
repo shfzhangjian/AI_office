@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const net = require('net');
+const messageLog = require(require('path').join(__dirname,'..','frontend','assets','message-log'));
 const identity = require(require('path').join(__dirname,'..','lib','identity'));
 const { execSync } = require('child_process');
 
@@ -65,6 +66,7 @@ function projectAgent(e){
  const a=agentRecords[id]||(agentRecords[id]={id,name:e.agent_name||id,state:'idle',task:'',detail:'',progress:null,documents_count:0,pending_tasks:Object.create(null),history:[],seq:0});
  if(e.agent_name)a.name=e.agent_name;
  for(const key of ['provider','tenant_id','app_id','robot_code','conversation_type','conversation_id','executor_id'])if(e[key])a[key]=e[key];
+ messageLog.append(a,e);
  if(e.type==='agent'){a.registered=true;a.seq=e.seq;return;}
  if(['state','task'].includes(e.type)){a.state=e.status==='running'?'executing':e.status==='failed'?'error':e.status;if(e.summary)a.task=e.summary;a.detail=e.detail||e.summary||'';a.progress=Number.isFinite(e.progress)?e.progress:null;}
  let delta=0;
