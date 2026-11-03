@@ -161,6 +161,7 @@ AI_office/
 
 ## 🧭 可扩展方向
 
+- **常驻部署 / 按仓库更新线上**：本仓库就是我这套正在跑的系统唯一的代码源，pm2 两个进程（`town-server` / `town-collector`）+ 一份 ecosystem 用环境变量桥接数据目录。日常 `git pull && pm2 startOrRestart ~/town/town-ecosystem.json --update-env` 即上线。全过程见 [`docs/DEPLOY.md`](docs/DEPLOY.md)。
 - **加建筑**：`collectord.js` 加一个 `tcpProbe(port)` 采集器 → `town.html` 加一个 `<g id>` 建筑节点 → 重启两个进程，新建筑下个 tick 自动点亮。三步指南见 [`docs/我开口记账.md`](docs/我开口记账.md)。
 - **换皮**：删掉 `frontend/assets/`，接你自己的原创像素素材即可（代码不认素材内容，只认精灵图网格尺寸）。
 - **加状态**：八态想扩到更多，改 `collectord.js` 的 `normalizeState` + `town.html` 的 `AREAS/ANIM_OF/STATE_LABEL` 三处映射即可。
