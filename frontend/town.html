@@ -51,7 +51,7 @@ footer{width:100%;text-align:center;color:#6a6250;font-size:11px;padding:0 10px 
 
 <script>
 const $ = id => document.getElementById(id);
-const A = 'town-assets/';
+const A = '/town-assets/';
 const STATUS_CLASS = { done:'ok', up:'ok', online:'ok', ok:'ok', running:'run', failed:'err', timeout:'err', down:'err', offline:'err', warn:'warn', note:'info', writing:'run', executing:'run', researching:'run', syncing:'run', receiving:'info', replying:'info', idle:'info', error:'err' };
 
 // ===== 精灵加载与网格动画 =====
@@ -70,12 +70,10 @@ async function loadAll(){
     loadImg(A+'cats-spritesheet.png').then(i=>SPR.cats=grid(i,160,160,16)),
     loadImg(A+'serverroom-spritesheet.png').then(i=>SPR.servers=grid(i,180,251,40)),
     loadImg(A+'flowers-bloom-v2.png').then(i=>SPR.flowers=i),
-    // 角色动画（工作帧带 #26232e 深紫底，运行时色键抠底）
-    loadImg(A+'star-idle-v5.png').then(i=>SPR.idle=grid(i,128,128,192)),
-    loadImg(A+"star-work-clean.png").then(i=>{const cc=document.createElement('canvas');cc.width=i.width;cc.height=i.height;const xx=cc.getContext('2d');xx.imageSmoothingEnabled=false;xx.drawImage(i,0,0);SPR.writing=grid(cc,230,144,80);}),
+    // Project-owned SVG cat: identical character across all work states.
+    ...['idle','typing-left','typing-right','blink'].map(pose=>
+      loadImg(A+'office-cat-'+pose+'.svg').then(i=>SPR['cat-'+pose]=i)),
     loadImg(A+'sync-animation-v3-grid.png').then(i=>SPR.syncing=grid(i,256,256,49)),
-    loadImg(A+'error-bug-spritesheet-grid.png').then(i=>SPR.error=grid(i,180,180,99)),
-    loadImg(A+'guest_anim_1.webp').then(i=>SPR.researching=grid(i,128,64,1)),
   ];
   await Promise.allSettled(jobs);
   $('loading').style.display='none';
@@ -83,10 +81,10 @@ async function loadAll(){
 
 // ===== 状态 → 动画 + 站位（layout.js 的坐标）=====
 const AREAS = {
-  researching:{x:320,y:360}, replying:{x:430,y:400},
+  writing:{x:368,y:554}, executing:{x:368,y:554}, researching:{x:520,y:340}, replying:{x:430,y:400},
   receiving:{x:640,y:400}, syncing:{x:1000,y:470}, error:{x:1050,y:300}, idle:{x:660,y:400}
 };
-const ANIM_OF = { writing:'writing', executing:'writing', researching:'writing', syncing:'syncing', error:'error', idle:'idle', receiving:'writing', replying:'writing' };
+const ANIM_OF = { writing:'writing', executing:'writing', researching:'idle', syncing:'syncing', error:'error', idle:'idle', receiving:'idle', replying:'idle' };
 const STATE_LABEL = { idle:'💤 摸鱼待命', writing:'✍️ 输出中', receiving:'📥 收消息', replying:'💬 回复中', researching:'🔎 调研中', executing:'⚡ 执行任务', syncing:'☁️ 同步中', error:'🔴 出错了' };
 
 let selfState='idle', selfDetail='', animFrame=0, lastTick=0, walkFrom=null, walkTo=null, walkT=0;
@@ -105,30 +103,31 @@ function addEv(e, pre){
   const d = document.createElement('div');
   d.className = 'ev ' + (STATUS_CLASS[e.status]||'info');
   const t = new Date(e.ts);
-  d.innerHTML = `<span class="t">${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}</span><span class="s">${e.status}</span><span>${e.source}/${e.subject} ${(e.summary||'').slice(0,60)}</span>`;
+  const fields = [['t',t.toLocaleTimeString('zh-CN',{hour12:false})],['s',e.status],['',`${e.source}/${e.subject} ${String(e.summary||'').slice(0,60)}`]];
+  for(const [cls,value] of fields){const span=document.createElement('span');span.className=cls;span.textContent=value;d.appendChild(span);}
   pre ? evbox.appendChild(d) : evbox.prepend(d);
   while (evbox.children.length > 300) evbox.removeChild(evbox.lastChild);
 }
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.style.opacity=1; setTimeout(()=>t.style.opacity=0,5000); }
 
-const svc = { dsh:true, model:true, pm2:true, guard:true, tunnel:true };
+const svc = { model:true, pm2:true };
+const services = {};
 function paint(e){
   if (e.type==='state'){ setSelf(e.status, e.summary); if(e.status==='error') toast('🔴 '+ (e.summary||'我卡住了')); return; }
-  if (e.source==='dsh') svc.dsh = e.status==='up';
-  if (e.source==='model') svc.model = e.status==='up';
-  if (e.source==='panel'||e.source==='pm2') svc.pm2 = (svc.pm2||e.status==='online');
-  if (e.subject==='dsh-web'&&e.source==='dsh') { if(!svc.dsh){ selfState='error'; $('sbText').textContent='🔴 dsh 掉了'; } }
+  if(e.type==='heartbeat' || e.type==='process') services[`${e.source}:${e.subject}`]=e.status;
+  if(e.type==='heartbeat' && ['model','local-llm'].includes(e.source)) svc.model=e.status==='up';
+  svc.pm2=Object.entries(services).filter(([key])=>key.startsWith('pm2:')).every(([,status])=>status==='online');
 }
 
 function connect(){
-  const es = new EventSource('/api/town-events');
+  const es = new EventSource('/api/town-events?after='+lastSeq);
   es.onmessage = m => { const e=JSON.parse(m.data); if(e.seq<=lastSeq)return; lastSeq=e.seq; addEv(e); paint(e);
     $('sbSeq').textContent = '· 第 '+e.seq+' 手';
     if (e.type==='task'&&e.status==='done') toast('🌾 收成！'+(e.summary||e.subject));
     if (e.type==='task'&&(e.status==='failed'||e.status==='timeout')) toast('🥀 '+(e.summary||e.subject)+' '+e.status); };
   es.onerror = () => { es.close(); setTimeout(connect, 5000); };
 }
-connect();
+// Connect after snapshot initialization to avoid stale state replay.
 
 // ===== 绘制循环 =====
 const cv = $('cv'), ctx = cv.getContext('2d');
@@ -182,10 +181,26 @@ function drawAnchored(name, g, x, y, scale, fps){
   const w=g.fw*scale, h=g.fh*scale;
   ctx.drawImage(g.img, col*g.fw, row*g.fh, g.fw, g.fh, x-w/2, y-h, w, h);
 }
-function draw(dt){ try { drawInner(dt); } catch(e){ ctx.font='28px monospace'; ctx.fillStyle='#f33'; ctx.fillText('ERR:'+e.message, 40, 380); throw e; } }
+function drawOfficeCat(x, y, state, walking){
+  const working = !walking && ['writing','executing','replying'].includes(state);
+  const pose = working ? (Math.floor(animFrame/8)%2 ? 'typing-left':'typing-right')
+    : (Math.floor(animFrame)%240 >= 228 ? 'blink':'idle');
+  const image = SPR['cat-'+pose] || SPR['cat-idle'];
+  if(!image) return;
+  const bob = walking ? Math.sin(animFrame/4)*3 : Math.sin(animFrame/30)*1;
+  ctx.drawImage(image, x-64, y-128+bob, 128, 128);
+  if(working){
+    ctx.fillStyle='#514f58';ctx.fillRect(x-37,y-16,74,12);
+    ctx.fillStyle='#b7bdc2';
+    for(let row=0;row<2;row++)for(let col=0;col<9;col++)ctx.fillRect(x-33+col*8,y-14+row*5,5,3);
+  }
+  const badge = {researching:'?',receiving:'…',syncing:'↻',error:'!'}[state];
+  if(badge){ctx.save();ctx.font='bold 22px sans-serif';ctx.textAlign='center';ctx.fillStyle=state==='error'?'#ed6455':'#f5df9b';ctx.fillText(badge,x+46,y-108+bob);ctx.restore();}
+}
+function draw(timestamp){ const dt=lastTick ? Math.min(50, Math.max(0,timestamp-lastTick)) : 0; lastTick=timestamp; try { drawInner(dt); } catch(e){ ctx.font='28px monospace'; ctx.fillStyle='#f33'; ctx.fillText('ERR:'+e.message, 40, 380); throw e; } }
 function drawInner(dt){
   if(window.__demoMode){window.demoEase(); const c=window.__cam; ctx.save(); ctx.translate(640,400); ctx.scale(c.z,c.z); ctx.translate(-c.x,-c.y);}
-  animFrame += dt/1000*30;
+  animFrame += dt/1000*60;
   ctx.imageSmoothingEnabled=false;
   ctx.clearRect(0,0,1280,720);
   if(SPR.bg) ctx.drawImage(SPR.bg,0,0,1280,720);
@@ -205,25 +220,8 @@ function drawInner(dt){
   // 走路插值
   if(walkTo){ walkT=Math.min(1,walkT+dt/1400); starPos={x:walkFrom.x+(walkTo.x-walkFrom.x)*walkT, y:walkFrom.y+(walkTo.y-walkFrom.y)*walkT}; if(walkT>=1) walkTo=null; }
   const at = starPos;
-  const g0 = SPR[ANIM_OF[selfState]] || SPR.idle; let g = g0;
-  if(g){
-    if(ANIM_OF[selfState]==='writing'){
-      const gg = SPR.writing;
-      const sc=1.22; const w=230*sc, h=144*sc;
-      const cyc=[0,1,2,3,4,5,6,7,8,9,10,11,10,9,8,7,6,5,4,3,2,1];  // 相邻12帧乒乓=钳子敲动
-      const f=(cyc[Math.floor(animFrame/4)%cyc.length])%gg.count;
-      const col=f%gg.cols, row=Math.floor(f/gg.cols);
-      if(SPR.desk) ctx.drawImage(SPR.desk, 118, 336, 276, 214);
-      ctx.drawImage(gg.img, col*230, row*144, 230, 144, 368-w/2, 482-h/2, w, h);
-    } else {
-      if(SPR.desk) ctx.drawImage(SPR.desk, 118, 336, 276, 214);
-      if(selfState==='error'){
-        ctx.save(); ctx.globalAlpha=.85+.15*Math.sin(animFrame/6); drawGridSprite(g, at.x, at.y+10, .9, 12, 0); ctx.restore();
-      } else {
-        drawGridSprite(g, at.x, at.y+10, 1.35, 10, 0);
-      }
-    }
-  }
+  if(SPR.desk) ctx.drawImage(SPR.desk, 118, 336, 276, 214);
+  drawOfficeCat(at.x, at.y, selfState, Boolean(walkTo));
   // 猫（常驻，随机帧慢放）
   if(SPR.cats) drawGridSpriteFrame(SPR.cats, 3+(Math.floor(animFrame/300)%3)*4, 118, 700, .62);
   // error 红色氛围
@@ -242,15 +240,16 @@ function yesterdayMemo(){
     $('memo').textContent = done+failed? `昨日：收成${done}·枯苗${failed}` : '昨日休耕';
   }).catch(()=>{});
 }
-fetch('/api/town-snapshot').then(r=>r.json()).then(s=>{(s.events||[]).slice().reverse().forEach(e=>{lastSeq=Math.max(lastSeq,e.seq);addEv(e,true);paint(e);}); if(s.events&&s.events[0]) $('sbSeq').textContent='· 第 '+s.events[0].seq+' 手'; yesterdayMemo();}).catch(()=>yesterdayMemo());
+fetch('/api/town-snapshot').then(r=>r.json()).then(s=>{Object.values(s.entities||{}).sort((a,b)=>a.seq-b.seq).forEach(paint);(s.events||[]).slice().reverse().forEach(e=>{lastSeq=Math.max(lastSeq,e.seq);addEv(e);if(!s.entities)paint(e);}); lastSeq=Math.max(lastSeq,s.seq||0); if(s.events&&s.events[0]) $('sbSeq').textContent='· 第 '+s.events[0].seq+' 手'; yesterdayMemo();}).catch(()=>yesterdayMemo()).finally(connect);
 
-fetch('/api/town-weather').then(r=>r.json()).then(d=>{
-  const c=d.current,code=c.weather_code;
+function refreshWeather(){ fetch('/api/town-weather').then(r=>r.json()).then(d=>{
+  clearInterval(window.__weatherTimer); $('snowfx').replaceChildren(); const c=d.current,code=c.weather_code;
   const snow=[71,73,75,77,85,86].includes(code), rain=[51,53,55,61,63,65,80,81,82].includes(code);
   $('weather').textContent=`${snow?'❄️雪':rain?'🌧️雨':code>=1?'☁️':'☀️'} ${Math.round(c.temperature_2m)}° 北京`;
-  if(snow||rain){ window.__snow=snow; const L=$('snowfx'); const ch=snow?'❄':'💧';
-    setInterval(()=>{const s=document.createElement('span');s.textContent=ch;s.style.cssText=`position:absolute;left:${Math.random()*100}vw;top:-20px;font-size:${10+Math.random()*10}px;transition:transform 7s linear,opacity 7s`;L.appendChild(s);requestAnimationFrame(()=>{s.style.transform='translateY(105vh)';s.style.opacity=.2;});setTimeout(()=>s.remove(),7200);}, snow?420:220); }
-}).catch(()=>{});
+  if(snow||rain){ window.__snow=snow; const L=$('snowfx'); L.replaceChildren(); clearInterval(window.__weatherTimer); const ch=snow?'❄':'💧';
+    window.__weatherTimer=setInterval(()=>{const s=document.createElement('span');s.textContent=ch;s.style.cssText=`position:absolute;left:${Math.random()*100}vw;top:-20px;font-size:${10+Math.random()*10}px;transition:transform 7s linear,opacity 7s`;L.appendChild(s);requestAnimationFrame(()=>{s.style.transform='translateY(105vh)';s.style.opacity=.2;});setTimeout(()=>s.remove(),7200);}, snow?420:220); }
+}).catch(()=>{ $('weather').textContent='天气暂不可用'; }); }
+refreshWeather(); setInterval(refreshWeather,900000);
 
 setInterval(()=>{ $('clock').textContent=new Date().toLocaleString('zh-CN',{hour12:false}); },1000);
 
@@ -258,15 +257,15 @@ setInterval(()=>{ $('clock').textContent=new Date().toLocaleString('zh-CN',{hour
 (function(){
   let cam={x:640,y:360,z:1, tx:640,ty:360,tz:1};
   const _di=setSelf;
-  window.__demoMode=true;
+  window.__demoMode=false;
   window.setFeed=function(){};
-  window.demo=function(x,y,z){cam.tx=x;cam.ty=y;cam.tz=z;};
+  window.demo=function(x,y,z){window.__demoMode=true;cam.tx=x;cam.ty=y;cam.tz=z;};
   window.demoEase=function(){cam.x+=(cam.tx-cam.x)*0.04;cam.y+=(cam.ty-cam.y)*0.04;cam.z+=(cam.tz-cam.z)*0.04;};
   window.__cam=cam;
   // 挂到 drawInner 末尾（rAF 每帧）
   const _origDraw = window.__origDrawInner || drawInner;
   window.__origDrawInner = _origDraw;
-  window.drawInner = function(dt){ demoEase(); _origDraw(dt); };
+  // Normal rendering uses a single animation loop; camera is opt-in via demo().
 })();
 </script>
 </body>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="crispEdges">
+<title>Office orange cat — typing-right</title>
+<ellipse cx="32" cy="59" rx="23" ry="3" fill="#302b29" opacity=".2"/>
+<path d="M46 48h8v-9h5v15h-5v4H43z" fill="#b85e32"/>
+<path d="M20 34h24v7h4v17H16V41h4z" fill="#dc873f" stroke="#633e2d" stroke-width="2"/>
+<path d="M25 40h14v16H25z" fill="#ffe4af"/>
+<path d="M14 13V5h5l9 9h8l9-9h5v24h-4v8h-7v4H25v-4h-7v-8h-4z" fill="#e79a4b" stroke="#633e2d" stroke-width="2"/>
+<path d="M18 11h3v6h-3z M43 11h3v6h-3z" fill="#e8ad94"/>
+<path d="M28 15h3v7h-3z M34 15h3v7h-3z M16 22h6v3h-6z M42 22h6v3h-6z" fill="#b85e32"/>
+<path d="M23 30h18v5h-4v4H27v-4h-4z" fill="#ffe4af"/>
+<path d="M22 25h4v5h-4z M38 25h4v5h-4z" fill="#302b29"/><path d="M30 30h4v3h-4z" fill="#a15f58"/>
+<path d="M27 35h4v-2h2v2h4" fill="none" stroke="#633e2d" stroke-width="1"/>
+<path d="M17 48h12v6H17z M35 45h12v6H35z" fill="#ffe4af"/>
+</svg>

@@ -27,17 +27,22 @@ const TUNNEL_LOG = process.env.TUNNEL_LOG || '/tmp/town-tunnel.log';
 fs.mkdirSync(TOWN, { recursive: true });
 
 let seq = 0;
-let tickPaused = false;
+const history = [];
+const entities = {};
 try {
-  const raw = fs.readFileSync(EVENTS, 'utf8').trim().split('\n');
-  const last = raw[raw.length - 1];
-  if (last) seq = JSON.parse(last).seq || 0;
-} catch {}
-
+  for (const line of fs.readFileSync(EVENTS, 'utf8').split('\n')) {
+    try { const e = JSON.parse(line); if (!Number.isSafeInteger(e.seq) || e.seq <= 0) continue; seq = Math.max(seq, e.seq); history.push(e); entities[`${e.source}:${e.subject}`] = e; } catch {}
+  }
+  // Separate a crash-truncated tail from the next complete record.
+  const raw = fs.readFileSync(EVENTS);
+  if (raw.length && raw[raw.length-1] !== 10) fs.appendFileSync(EVENTS, '\n');
+} catch (e) { if (e.code !== 'ENOENT') throw e; }
 const emit = (source, type, subject, status, summary, link) => {
-  seq += 1;
-  const ev = { seq, ts: new Date().toISOString(), source, type, subject, status, summary: summary || '', link: link || '' };
-  fs.appendFile(EVENTS, JSON.stringify(ev) + '\n', (e) => { if (e) console.error('emit fail', e.message); });
+  const ev = { seq: seq + 1, ts: new Date().toISOString(), source, type, subject, status, summary: summary || '', link: link || '' };
+  fs.appendFileSync(EVENTS, JSON.stringify(ev) + '\n');
+  seq = ev.seq;
+  history.push(ev); if (history.length > 100) history.shift();
+  entities[`${source}:${subject}`] = ev;
   return ev;
 };
 
@@ -63,9 +68,10 @@ const last = {}; // key -> signature
 function ifChanged(key, sig, makeEvent) {
   if (last[key] === sig) return null;
   const first = last[key] === undefined;
-  last[key] = sig;
   if (first && key.startsWith('skipfirst:')) return null; // 首轮静默基线
-  return emit(...makeEvent());
+  const event = emit(...makeEvent());
+  last[key] = sig;
+  return event;
 }
 
 // —— 状态归一（抄 Star-Office-UI normalize_agent_state）——
@@ -92,36 +98,10 @@ function sampleSelfState() {
   const stale = !Number.isFinite(updated) || (Date.now() - updated) > STALE_TTL_MS;
   const working = ['writing', 'receiving', 'replying', 'researching', 'executing', 'syncing'].includes(state);
   if (stale && working) state = 'idle';
-  ifChanged(`self:${state}:${st.detail||''}`, '1', () => ['self', 'state', 'me', state, st.detail || '', '']);
+  ifChanged('self:me', JSON.stringify([state, st.detail||'']), () => ['self', 'state', 'me', state, st.detail || '', '']);
 }
 
 // —— 采样器 ——
-// 自报事件（source=self，seq=0 占位）在 collectord 侧补发真 seq，保证下游单调
-function adoptSelfEvents() {
-  let lines;
-  try { lines = fs.readFileSync(EVENTS, 'utf8').split('\n'); } catch { return; }
-  const selfBare = lines.some(l => l.includes('"source":"self"') && l.includes('"seq":0'));
-  if (!selfBare) return;
-  // 先冻结新事件 500ms（emit 是 appendFile 异步，避免重写窗口丢事件）
-  tickPaused = true;
-  setTimeout(() => {
-    try {
-      lines = fs.readFileSync(EVENTS, 'utf8').split('\n');
-      const seen = new Set();
-      const out = [];
-      for (const l of lines) {
-        if (!l) continue;
-        let e; try { e = JSON.parse(l); } catch { continue; }
-        if (e.source === 'self' && e.seq === 0 && !seen.has(e.ts)) {
-          seq += 1; e.seq = seq; seen.add(e.ts);
-        }
-        out.push(JSON.stringify(e));
-      }
-      fs.writeFileSync(EVENTS, out.join('\n') + '\n');
-    } finally { tickPaused = false; }
-  }, 500);
-}
-
 async function sampleDtask() {
   let dirs = [];
   try { dirs = fs.readdirSync(DTASK, { withFileTypes: true }).filter(d => d.isDirectory()).map(d => d.name); } catch { return; }
@@ -132,16 +112,16 @@ async function sampleDtask() {
     let status = 'running';
     const done = readJsonSafe(path.join(DTASK, id, 'done.json'));
     if (done) status = done.exit === 0 ? 'done' : (done.exit === 142 ? 'timeout' : 'failed');
-    ifChanged(`dtask:${id}:${status}`, '1', () => ['dtask', 'task', id, status, meta.name || '', '']);
+    ifChanged(`dtask:${id}`, JSON.stringify([status, meta.name||'']), () => ['dtask', 'task', id, status, meta.name || '', '']);
   }
 }
 
 function samplePm2() {
   let list;
-  try { list = JSON.parse(execSync('pm2 jlist 2>/dev/null', { timeout: 4000, maxBuffer: 8 * 1024 * 1024 }).toString()); } catch { return; }
+  try { list = JSON.parse(execSync('pm2 jlist', { stdio: ['ignore','pipe','ignore'], timeout: 4000, maxBuffer: 8 * 1024 * 1024 }).toString()); } catch { return; }
   for (const p of list) {
     const st = p.pm2_env && p.pm2_env.status || 'unknown';
-    ifChanged(`pm2:${p.name}:${st}`, String(p.pm2_env.restart_time),
+    ifChanged(`pm2:${p.name}`, JSON.stringify([st, p.pm2_env.restart_time]),
       () => ['pm2', 'process', p.name, st, `restarts=${p.pm2_env.restart_time}`, '']);
   }
 }
@@ -154,7 +134,7 @@ async function sampleHeartbeat() {
     const port = parseInt(portStr, 10);
     if (!name || !port) continue;
     const up = await tcpProbe(port, '127.0.0.1') ? 'up' : 'down';
-    ifChanged(`hb:${name}:${up}`, '1', () => [name, 'heartbeat', name, up, `端口:${port}`, '']);
+    ifChanged(`hb:${name}`, up, () => [name, 'heartbeat', name, up, `端口:${port}`, '']);
   }
 }
 
@@ -175,26 +155,19 @@ function sampleTunnel() {
 
 // —— 快照（面板/小镇首屏直接读）——
 function writeSnapshot() {
-  const evs = [];
-  try {
-    const raw = fs.readFileSync(EVENTS, 'utf8').trim().split('\n').slice(-500);
-    for (const l of raw) { if (l) evs.push(JSON.parse(l)); }
-  } catch {}
-  const byLatest = {};
-  for (const e of evs) byLatest[`${e.source}:${e.subject}`] = e;
   const snap = {
     updated: new Date().toISOString(),
     seq,
     counts: { total: seq },
-    now: Object.values(byLatest).filter(e => e.status === 'running' || e.status === 'up' || e.status === 'ok').map(e => e.subject),
-    events: evs.slice(-100).reverse(),
+    now: Object.values(entities).filter(e => e.status === 'running' || e.status === 'up' || e.status === 'ok').map(e => e.subject),
+    entities,
+    events: history.slice(-100).reverse(),
   };
-  fs.writeFile(SNAPSHOT, JSON.stringify(snap, null, 1), () => {});
+  fs.writeFileSync(SNAPSHOT + '.tmp', JSON.stringify(snap, null, 1));
+  fs.renameSync(SNAPSHOT + '.tmp', SNAPSHOT);
 }
 
 async function tick() {
-  if (tickPaused) return;
-  try { adoptSelfEvents(); } catch (e) { console.error('adopt', e.message); }
   try { sampleSelfState(); } catch (e) { console.error('selfstate', e.message); }
   try { await sampleDtask(); } catch (e) { console.error('dtask', e.message); }
   try { samplePm2(); } catch (e) { console.error('pm2', e.message); }
@@ -205,5 +178,5 @@ async function tick() {
 }
 
 console.log(`collectord start · town=${TOWN} interval=${INTERVAL}ms seq=${seq}`);
-tick();
-setInterval(tick, INTERVAL);
+async function run() { try { await tick(); } finally { setTimeout(run, Math.max(100, INTERVAL || 5000)); } }
+run();
