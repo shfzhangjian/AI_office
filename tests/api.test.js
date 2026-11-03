@@ -17,7 +17,7 @@ test('HTTP ingestion persists, validates and deduplicates; collector projects re
  await send({type:'service',subject:'llm',status:'up',load:92},'service');
  await send({type:'schedule',subject:'daily',run_id:'http-run',status:'triggered',job_name:'日报'},'schedule-trigger');
  const source=fs.readFileSync(path.join(__dirname,'../collector/collectord.js'),'utf8').split('console.log(`collectord start')[0];
- const create=()=>{const c={require,process:{env:{TOWN_DIR:dir}},console,setTimeout};vm.createContext(c);vm.runInContext(source,c);return c};
+ const create=()=>{const c={__dirname:path.join(__dirname,'../collector'),require,process:{env:{TOWN_DIR:dir}},console,setTimeout};vm.createContext(c);vm.runInContext(source,c);return c};
  const c=create();vm.runInContext('drainInbox();writeSnapshot();',c);
  const applied=await(await fetch(base+'/api/town-inbox/'+queued.id)).json();assert.equal(applied.status,'applied');assert.equal(applied.seq,1);
  assert.equal((await send(state,'state')).status,200);
@@ -33,7 +33,7 @@ test('schedule contract validates lifecycle, timezone and run identity',()=>{
 });
 test('collector persists independent scheduled runs and terminal status across restart',()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'office-schedule-'));try{
- const source=fs.readFileSync(path.join(__dirname,'../collector/collectord.js'),'utf8').split('console.log(`collectord start')[0];const make=()=>{const c={require,process:{env:{TOWN_DIR:dir}},console,setTimeout};vm.createContext(c);vm.runInContext(source,c);return c};
+ const source=fs.readFileSync(path.join(__dirname,'../collector/collectord.js'),'utf8').split('console.log(`collectord start')[0];const make=()=>{const c={__dirname:path.join(__dirname,'../collector'),require,process:{env:{TOWN_DIR:dir}},console,setTimeout};vm.createContext(c);vm.runInContext(source,c);return c};
  const c=make();vm.runInContext(`emit('api','schedule','daily','triggered','trigger','',{run_id:'a'});emit('api','schedule','daily','done','done','',{run_id:'a'});emit('api','schedule','daily','running','late','',{run_id:'a'});emit('api','schedule','daily','triggered','next run','',{run_id:'b'});writeSnapshot();`,c);
  const restarted=make();vm.runInContext('writeSnapshot()',restarted);const snap=JSON.parse(fs.readFileSync(path.join(dir,'snapshot.json')));assert.equal(snap.schedules.length,2);assert.equal(snap.schedules.find(r=>r.run_id==='a').status,'done');assert.equal(snap.schedules.find(r=>r.run_id==='b').status,'triggered');
  }finally{fs.rmSync(dir,{recursive:true,force:true})}

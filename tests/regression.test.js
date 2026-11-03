@@ -7,7 +7,7 @@ test('collector reports state recovery and preserves sequence after damaged tail
  try{
  fs.writeFileSync(path.join(dir,'events.jsonl'),JSON.stringify({seq:42,source:'test',subject:'x',status:'up'})+'\n{broken');
  const source=fs.readFileSync(path.join(__dirname,'../collector/collectord.js'),'utf8').split('console.log(`collectord start')[0];
- const context={require,process:{env:{TOWN_DIR:dir}},console,setTimeout};vm.createContext(context);vm.runInContext(source,context);
+ const context={__dirname:path.join(__dirname,'../collector'),require,process:{env:{TOWN_DIR:dir}},console,setTimeout};vm.createContext(context);vm.runInContext(source,context);
  vm.runInContext("for(const st of ['up','down','up'])ifChanged('hb:test',st,()=>['test','heartbeat','test',st,'','']);writeSnapshot();",context);
  const records=fs.readFileSync(path.join(dir,'events.jsonl'),'utf8').split('\n').flatMap(x=>{try{return [JSON.parse(x)]}catch{return []}});
  assert.deepEqual(records.slice(-3).map(x=>x.status),['up','down','up']);assert.equal(records.at(-1).seq,45);

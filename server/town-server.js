@@ -122,6 +122,10 @@ const server = http.createServer(async (req, res) => {
       .catch(() => { res.writeHead(503, {'Content-Type':'application/json'}); res.end('{}'); });
     return;
   }
+  if(url.pathname === '/api/town-dingtalk/bindings'){
+    try{const roster=require('../lib/identity').loadRoster(TOWN_DIR);res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({agents:roster.agents.map(a=>({id:a.id,name:a.name})),bots:roster.bots.map(b=>({tenant_id:b.tenant_id,app_id:b.app_id,robot_code:b.robot_code,agent_id:b.agent_id}))}));}
+    catch(e){res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({error:e.message}));}return;
+  }
   if(url.pathname === '/api/town-schedules'){
     try{const snap=JSON.parse(fs.readFileSync(TOWN_SNAP));res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({updated:snap.updated,items:snap.schedules||[]}));}
     catch{res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Collector snapshot unavailable'}));}return;

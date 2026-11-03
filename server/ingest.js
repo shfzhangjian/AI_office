@@ -1,15 +1,16 @@
 'use strict';
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const STATES=new Set(['idle','writing','receiving','replying','researching','executing','syncing','error','thinking','anxious','blocked','done']);
-const TYPES=new Set(['state','task','document','log','service','schedule']);
+const TYPES=new Set(['state','task','document','log','service','schedule','agent']);
 function validate(input){
  if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Expected a JSON object');
- if(!TYPES.has(input.type))throw Error('type must be state, task, document, log, service or schedule');
+ if(!TYPES.has(input.type))throw Error('type must be state, task, document, log, service, schedule or agent');
  const out={type:input.type,source:'api'};
- for(const [key,max] of Object.entries({subject:100,agent_id:100,agent_name:80,status:40,summary:2000,detail:4000,run_id:100,job_name:160,scheduler:80,scheduled_for:40,started_at:40,finished_at:40,timezone:80})){
+ for(const [key,max] of Object.entries({subject:100,agent_id:100,agent_name:80,status:40,summary:2000,detail:4000,run_id:100,job_name:160,scheduler:80,scheduled_for:40,started_at:40,finished_at:40,timezone:80,provider:40,tenant_id:150,app_id:150,robot_code:150,conversation_type:20,conversation_id:200,external_subject:200,executor_id:100})){
   if(input[key]!==undefined){if(typeof input[key]!=='string'||input[key].length>max||/[\u0000-\u0008]/.test(input[key]))throw Error('Invalid '+key);out[key]=input[key];}
  }
  if(!out.subject||!out.subject.trim())throw Error('subject is required');
+ if(input.type==='agent'){if(out.status!=='registered'||!out.agent_name)throw Error('agent registration requires registered status and agent_name');out.agent_id=out.subject;}
  if(input.type==='state'){if(!STATES.has(out.status))throw Error('Invalid agent status');out.agent_id=out.subject;}
  if(input.type==='task'){if(!out.agent_id)throw Error('task requires agent_id');if(!['queued','pending','running','done','failed','timeout','archived'].includes(out.status))throw Error('Invalid task status');}
  if(['document','log'].includes(input.type)&&!out.agent_id)throw Error('document/log requires agent_id');
@@ -31,7 +32,7 @@ function json(res,status,data){res.writeHead(status,{'Content-Type':'application
 function createIngest(dir){
  const pending=path.join(dir,'inbox','pending'),processed=path.join(dir,'inbox','processed');
  return async function handle(req,res,url){
-  if(url.pathname==='/api/town-events'&&req.method==='POST'){
+  if(['/api/town-events','/api/town-dingtalk/events'].includes(url.pathname)&&req.method==='POST'){
    const token=process.env.TOWN_WRITE_TOKEN;
    if(token ? req.headers.authorization!=='Bearer '+token : !['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress)){json(res,401,{error:'Write authentication required'});return true;}
    // Cross-origin browser writes are not accepted, even when running on loopback.
@@ -40,8 +41,8 @@ function createIngest(dir){
    try{
     let bytes=0,chunks=[];for await(const chunk of req){bytes+=chunk.length;if(bytes>16384){json(res,413,{error:'Request exceeds 16 KiB'});return true;}chunks.push(chunk);}
     let body;try{body=JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{json(res,400,{error:'Invalid JSON'});return true;}
-    let event;try{event=validate(body)}catch(e){json(res,400,{error:e.message});return true;}
-    const key=req.headers['idempotency-key'];if(key!==undefined&&(typeof key!=='string'||key.length<1||key.length>200)){json(res,400,{error:'Invalid Idempotency-Key'});return true;}
+    let event;try{if(url.pathname==='/api/town-dingtalk/events'){const identity=require('../lib/identity');body=identity.normalizeDingTalk(body,identity.loadRoster(dir));}event=validate(body);if(url.pathname==='/api/town-dingtalk/events')event.source='dingtalk';}catch(e){json(res,400,{error:e.message});return true;}
+    let key=req.headers['idempotency-key'];if(key&&url.pathname==='/api/town-dingtalk/events')key=crypto.createHash('sha256').update(JSON.stringify([event.tenant_id,event.app_id,event.robot_code,key])).digest('hex');if(key!==undefined&&(typeof key!=='string'||key.length<1||key.length>200)){json(res,400,{error:'Invalid Idempotency-Key'});return true;}
     const id=key?crypto.createHash('sha256').update(key).digest('hex'):crypto.randomUUID();
     fs.mkdirSync(pending,{recursive:true});fs.mkdirSync(processed,{recursive:true});
     const file=path.join(pending,id+'.json'),receipt=path.join(processed,id+'.json');

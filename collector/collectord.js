@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const net = require('net');
+const identity = require(require('path').join(__dirname,'..','lib','identity'));
 const { execSync } = require('child_process');
 
 const HOME = os.homedir();
@@ -59,10 +60,12 @@ function projectAgent(e){
   }return;
  }
 
- if(!['state','task','document','log'].includes(e.type))return;
+ if(!['agent','state','task','document','log'].includes(e.type))return;
  const id=String(e.agent_id||(e.type==='state'?e.subject:'me'));
  const a=agentRecords[id]||(agentRecords[id]={id,name:e.agent_name||id,state:'idle',task:'',detail:'',progress:null,documents_count:0,pending_tasks:Object.create(null),history:[],seq:0});
  if(e.agent_name)a.name=e.agent_name;
+ for(const key of ['provider','tenant_id','app_id','robot_code','conversation_type','conversation_id','executor_id'])if(e[key])a[key]=e[key];
+ if(e.type==='agent'){a.registered=true;a.seq=e.seq;return;}
  if(['state','task'].includes(e.type)){a.state=e.status==='running'?'executing':e.status==='failed'?'error':e.status;if(e.summary)a.task=e.summary;a.detail=e.detail||e.summary||'';a.progress=Number.isFinite(e.progress)?e.progress:null;}
  let delta=0;
  if(Number.isFinite(e.documents_count))a.documents_count=e.documents_count;
@@ -127,15 +130,18 @@ function normalizeState(s) {
 // —— 自报状态文件（Star Office 协议：<TOWN_DIR>/state.json，由 town_state.sh 写入）——
 const SELF_STATE_FILE = path.join(TOWN, 'state.json');
 const STALE_TTL_MS = 10 * 60 * 1000; // 10min 不更新自动回 idle（防"假工作中"）
-function sampleSelfState() {
-  const st = readJsonSafe(SELF_STATE_FILE);
-  if (!st) return;
-  let state = normalizeState(st.state);
-  const updated = Date.parse(st.updated_at || '');
-  const stale = !Number.isFinite(updated) || (Date.now() - updated) > STALE_TTL_MS;
-  const working = ['writing', 'receiving', 'replying', 'researching', 'executing', 'syncing'].includes(state);
-  if (stale && working) state = 'idle';
-  ifChanged('self:me', JSON.stringify([state, st.detail||'',st.agent_name,st.progress,st.documents_count]), () => ['self', 'state', 'me', state, st.detail || '', '', {agent_id:'me',agent_name:st.agent_name||'me',progress:Number.isFinite(st.progress)?st.progress:null,...(Number.isFinite(st.documents_count)?{documents_count:st.documents_count}:{})}]);
+function sampleRoster(){const roster=identity.loadRoster(TOWN);for(const a of roster.agents)ifChanged('roster:'+a.id,a.name,()=>['roster','agent',a.id,'registered','角色已注册','',{agent_id:a.id,agent_name:a.name}]);}
+function sampleState(st,fallback){
+ if(!st)return;const actor=identity.resolveIdentity(st,identity.loadRoster(TOWN),{fallback});
+ let state=normalizeState(st.state),updated=Date.parse(st.updated_at||'');
+ if((!Number.isFinite(updated)||Date.now()-updated>STALE_TTL_MS)&&['writing','receiving','replying','researching','executing','syncing'].includes(state))state='idle';
+ const extra={agent_id:actor.id,agent_name:actor.name,progress:Number.isFinite(st.progress)?st.progress:null,...(Number.isFinite(st.documents_count)?{documents_count:st.documents_count}:{})};
+ ifChanged('self:'+actor.id,JSON.stringify([state,st.detail||'',extra]),()=>['self','state',actor.id,state,st.detail||'','',extra]);
+}
+function sampleSelfState(){
+ sampleState(readJsonSafe(SELF_STATE_FILE),process.env.TOWN_DEFAULT_AGENT_ID||(identity.loadRoster(TOWN).agents.length?'':'me'));
+ const folder=path.join(TOWN,'agents');let files;try{files=fs.readdirSync(folder).filter(f=>/^[a-zA-Z0-9_.-]+\.json$/.test(f))}catch(e){if(e.code==='ENOENT')return;throw e;}
+ for(const file of files){try{sampleState(readJsonSafe(path.join(folder,file)),path.basename(file,'.json'))}catch(e){console.error('agent state',file,e.message)}}
 }
 
 // —— 采样器 ——
@@ -146,10 +152,11 @@ async function sampleDtask() {
   for (const id of dirs) {
     const meta = readJsonSafe(path.join(DTASK, id, 'meta.json'));
     if (!meta) continue;
+    let actor;try{actor=identity.resolveIdentity(meta,identity.loadRoster(TOWN),{fallback:process.env.TOWN_DEFAULT_AGENT_ID||(identity.loadRoster(TOWN).agents.length?'':'me')})}catch(e){console.error('task identity',id,e.message);continue;}
     let status = 'running';
     const done = readJsonSafe(path.join(DTASK, id, 'done.json'));
     if (done) status = done.exit === 0 ? 'done' : (done.exit === 142 ? 'timeout' : 'failed');
-    ifChanged(`dtask:${id}`, JSON.stringify([status, meta.name||'',meta.agent_id,meta.agent_name,meta.detail,meta.progress,meta.documents_count]), () => ['dtask', 'task', id, status, meta.name || '', '', {agent_id:meta.agent_id||'me',agent_name:meta.agent_name,detail:meta.detail,progress:Number.isFinite(meta.progress)?meta.progress:null,...(Number.isFinite(meta.documents_count)?{documents_count:meta.documents_count}:{})}]);
+    ifChanged(`dtask:${id}`, JSON.stringify([status, meta.name||'',actor.id,actor.name,meta.detail,meta.progress,meta.documents_count]), () => ['dtask', 'task', id, status, meta.name || '', '', {...Object.fromEntries(['provider','tenant_id','app_id','robot_code','conversation_type','conversation_id','executor_id'].filter(k=>typeof meta[k]==='string').map(k=>[k,meta[k]])),agent_id:actor.id,agent_name:actor.name,detail:meta.detail,progress:Number.isFinite(meta.progress)?meta.progress:null,...(Number.isFinite(meta.documents_count)?{documents_count:meta.documents_count}:{})}]);
   }
 }
 
@@ -207,6 +214,7 @@ function writeSnapshot() {
 }
 
 async function tick() {
+  try{sampleRoster()}catch(e){console.error('roster',e.message)}
   try { drainInbox(); writeSnapshot(); } catch(e) { console.error('inbox',e.message); }
   try { sampleSelfState(); } catch (e) { console.error('selfstate', e.message); }
   try { await sampleDtask(); } catch (e) { console.error('dtask', e.message); }

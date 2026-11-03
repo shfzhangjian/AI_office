@@ -104,3 +104,7 @@ node collector/report.js event.json
 统一上报接口增加 `type: schedule`，支持 triggered/running/done/failed/missed，必须提供任务 subject 与每次执行唯一的 run_id。`GET /api/town-schedules` 查询最近100次运行，快照包含 schedules 数组。界面会提示新触发与执行结果，刷新时不回放历史弹窗。
 
 完整实现说明、字段、调用和调度器接入参见 [SCHEDULE_INTEGRATION.md](SCHEDULE_INTEGRATION.md)。
+
+## 多角色注册与钉钉适配
+
+`POST /api/town-events` 支持 `type: agent`、`status: registered`、角色subject与agent_name，用于提前注册闲置人物。钉钉来源请使用 `POST /api/town-dingtalk/events`，以注册表三元组进行严格角色绑定；查询接口为 `GET /api/town-dingtalk/bindings`。完整协议与线上桥接迁移步骤见 [DINGTALK_MULTI_BOT.md](DINGTALK_MULTI_BOT.md)。

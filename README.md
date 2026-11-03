@@ -243,3 +243,11 @@ node server/town-server.js
 工具栏“定时任务”可查看最近100次运行；新触发及完成/失败会显示通知，刷新仅恢复记录不重复弹窗。现有调度器可用 `collector/run-scheduled.js` 包装原命令，或通过统一接口发送 `type: schedule` 生命周期事件。
 
 详细文档：[定时任务接入与实现](docs/SCHEDULE_INTEGRATION.md)，包含协议、幂等重试、cron/Windows示例、角色联动、时区、验收和排障。项目展示上游调度事件，不自行创建系统定时任务。
+
+## 钉钉多机器人角色隔离
+
+新增角色注册与 roster.json 绑定：企业ID＋应用ID＋robot_code 精确映射到独立 agent_id。两个机器人在同群或单聊中保持不同工位，昵称或 senderId 相同也不会合并。角色闲置时仍保留；旧 state.json 与任务元数据支持显式默认角色，多角色状态可写到 agents/<角色ID>.json。
+
+可信桥接接口：`POST /api/town-dingtalk/events`；只读绑定查询：`GET /api/town-dingtalk/bindings`。示例配置：[config/roster.example.json](config/roster.example.json)。完整接入与迁移说明：[docs/DINGTALK_MULTI_BOT.md](docs/DINGTALK_MULTI_BOT.md)。
+
+注意：此接口供已认证的dsh/任务桥接进程调用，不是钉钉原始Webhook接收地址；本仓库没有线上dsh发送器源码，不会改变钉钉发送者显示。生产接入需补齐真实企业/应用/1030机器人编码，并修改桥接上报点。

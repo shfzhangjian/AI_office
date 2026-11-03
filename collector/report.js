@@ -7,7 +7,7 @@ async function main(){
  const headers={'Content-Type':'application/json'};
  if(process.env.TOWN_WRITE_TOKEN)headers.Authorization='Bearer '+process.env.TOWN_WRITE_TOKEN;
  if(process.env.TOWN_EVENT_KEY)headers['Idempotency-Key']=process.env.TOWN_EVENT_KEY;
- const response=await fetch(url+'/api/town-events',{method:'POST',headers,body:JSON.stringify(event),signal:AbortSignal.timeout(10000)});
+ const response=await fetch(url+(process.env.TOWN_EVENT_CHANNEL==='dingtalk'?'/api/town-dingtalk/events':'/api/town-events'),{method:'POST',headers,body:JSON.stringify(event),signal:AbortSignal.timeout(10000)});
  const result=await response.json();if(!response.ok)throw Error(result.error||'HTTP '+response.status);console.log(JSON.stringify(result));
 }
 main().catch(e=>{console.error(e.message);process.exitCode=1});
