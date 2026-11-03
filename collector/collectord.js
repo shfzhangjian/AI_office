@@ -34,6 +34,7 @@ const entities = {};
 const agentRecords = Object.create(null);
 const appliedInbox = new Map();
 const scheduleRuns = new Map();
+const modelSessions = new Map();
 try {
   for (const line of fs.readFileSync(EVENTS, 'utf8').split('\n')) {
     try { const e = JSON.parse(line); if (!Number.isSafeInteger(e.seq) || e.seq <= 0) continue; seq = Math.max(seq, e.seq); history.push(e); entities[`${e.source}:${e.subject}`] = e; projectAgent(e); if(e.event_id)appliedInbox.set(e.event_id,e.seq); } catch {}
@@ -54,6 +55,8 @@ const emit = (source, type, subject, status, summary, link, extra = {}) => {
 
 // Rebuild complete per-agent projections from the durable ledger, including documents.
 function projectAgent(e){
+ if(e.model_name&&e.session_id){const key=JSON.stringify([e.provider||'dsh',e.agent_id||'',e.session_id]);modelSessions.set(key,{...e,model_status:e.model_status||'idle'});if(modelSessions.size>100)modelSessions.delete(modelSessions.keys().next().value);}
+
  if(e.type==='schedule'){
   const previous=scheduleRuns.get(e.run_id);if(!previous||!['done','failed','missed'].includes(previous.status)||['done','failed','missed'].includes(e.status)){
    scheduleRuns.set(e.run_id,{...previous,...e,triggered_at:previous?.triggered_at||(e.status==='triggered'?e.ts:null)});
@@ -137,7 +140,7 @@ function sampleState(st,fallback){
  if(!st)return;const actor=identity.resolveIdentity(st,identity.loadRoster(TOWN),{fallback});
  let state=normalizeState(st.state),updated=Date.parse(st.updated_at||'');
  if((!Number.isFinite(updated)||Date.now()-updated>STALE_TTL_MS)&&['writing','receiving','replying','researching','executing','syncing'].includes(state))state='idle';
- const extra={agent_id:actor.id,agent_name:actor.name,progress:Number.isFinite(st.progress)?st.progress:null,...(Number.isFinite(st.documents_count)?{documents_count:st.documents_count}:{})};
+ const extra={...Object.fromEntries(['provider','session_id','model_name','model_status'].filter(k=>typeof st[k]==='string').map(k=>[k,st[k]])),agent_id:actor.id,agent_name:actor.name,progress:Number.isFinite(st.progress)?st.progress:null,...(Number.isFinite(st.documents_count)?{documents_count:st.documents_count}:{})};
  ifChanged('self:'+actor.id,JSON.stringify([state,st.detail||'',extra]),()=>['self','state',actor.id,state,st.detail||'','',extra]);
 }
 function sampleSelfState(){
@@ -208,6 +211,7 @@ function writeSnapshot() {
     now: Object.values(entities).filter(e => e.status === 'running' || e.status === 'up' || e.status === 'ok').map(e => e.subject),
     entities,
     agents: agentRecords,
+    models: [...modelSessions.values()],
     schedules: [...scheduleRuns.values()].sort((a,b)=>b.seq-a.seq),
     events: history.slice(-100).reverse(),
   };

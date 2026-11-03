@@ -27,6 +27,8 @@ test('HTTP ingestion persists, validates and deduplicates; collector projects re
  assert.equal((await(await fetch(base+'/api/town-agents')).json()).items.length,1);
  const c2=create();vm.runInContext('drainInbox();writeSnapshot();',c2);const restored=JSON.parse(fs.readFileSync(path.join(dir,'snapshot.json')));assert.equal(restored.seq,4);assert.equal(restored.schedules[0].run_id,'http-run');assert.equal((await(await fetch(base+'/api/town-schedules')).json()).items[0].job_name,'日报');assert.equal(restored.agents.alice.documents_count,6);
  const rows=fs.readFileSync(path.join(dir,'events.jsonl'),'utf8').trim().split('\n');assert.equal(rows.length,4);
+ await send({type:'model',subject:'model-check',provider:'dsh',session_id:'session-a',model_name:'test-model',model_status:'thinking'},'model');vm.runInContext('drainInbox();writeSnapshot();',c2);const models=await(await fetch(base+'/api/town-models')).json();assert.equal(models.items[0].model_name,'test-model');
+
  }finally{child.kill();await new Promise(resolve=>child.once('exit',resolve));fs.rmSync(dir,{recursive:true,force:true})}
 });
 test('schedule contract validates lifecycle, timezone and run identity',()=>{
@@ -39,4 +41,10 @@ test('collector persists independent scheduled runs and terminal status across r
  const c=make();vm.runInContext(`emit('api','schedule','daily','triggered','trigger','',{run_id:'a'});emit('api','schedule','daily','done','done','',{run_id:'a'});emit('api','schedule','daily','running','late','',{run_id:'a'});emit('api','schedule','daily','triggered','next run','',{run_id:'b'});writeSnapshot();`,c);
  const restarted=make();vm.runInContext('writeSnapshot()',restarted);const snap=JSON.parse(fs.readFileSync(path.join(dir,'snapshot.json')));assert.equal(snap.schedules.length,2);assert.equal(snap.schedules.find(r=>r.run_id==='a').status,'done');assert.equal(snap.schedules.find(r=>r.run_id==='b').status,'triggered');
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
+});
+
+test('model contract validates session/status and survives collector restart independently',()=>{
+ const base={type:'model',subject:'dsh-session',provider:'dsh',session_id:'session-a',model_name:'reported-model',model_status:'thinking'};
+ assert.equal(validate(base).model_name,'reported-model');for(const patch of [{session_id:''},{model_name:''},{model_status:'busy'},{model_name:123}])assert.throws(()=>validate({...base,...patch}));
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'office-model-'));try{const source=fs.readFileSync(path.join(__dirname,'../collector/collectord.js'),'utf8').split('console.log(`collectord start')[0];const make=()=>{const c={__dirname:path.join(__dirname,'../collector'),require,process:{env:{TOWN_DIR:dir}},console,setTimeout};vm.createContext(c);vm.runInContext(source,c);return c};const c=make();c.payload=base;vm.runInContext(`emit('api','model',payload.subject,'','','',payload);writeSnapshot()`,c);const restarted=make();vm.runInContext('writeSnapshot()',restarted);const snap=JSON.parse(fs.readFileSync(path.join(dir,'snapshot.json')));assert.equal(snap.models[0].model_name,'reported-model');assert.equal(Object.keys(snap.agents).length,0);}finally{fs.rmSync(dir,{recursive:true,force:true})}
 });

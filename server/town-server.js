@@ -130,9 +130,9 @@ const server = http.createServer(async (req, res) => {
     try{const snap=JSON.parse(fs.readFileSync(TOWN_SNAP));res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({updated:snap.updated,items:snap.schedules||[]}));}
     catch{res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Collector snapshot unavailable'}));}return;
   }
-  if (url.pathname === '/api/town-agents' || url.pathname === '/api/town-services') {
+  if (url.pathname === '/api/town-agents' || url.pathname === '/api/town-services' || url.pathname === '/api/town-models') {
     try { const snap = JSON.parse(fs.readFileSync(TOWN_SNAP));
-      const items=url.pathname.endsWith('agents') ? Object.values(snap.agents||{}) : Object.values(snap.entities||{}).filter(e=>['service','heartbeat','process'].includes(e.type));
+      const items=url.pathname.endsWith('models') ? (snap.models||[]) : url.pathname.endsWith('agents') ? Object.values(snap.agents||{}) : Object.values(snap.entities||{}).filter(e=>['service','heartbeat','process'].includes(e.type));
       res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({updated:snap.updated,items}));
     } catch { res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Collector snapshot unavailable'})); } return;
   }

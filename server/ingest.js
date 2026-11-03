@@ -1,12 +1,12 @@
 'use strict';
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const STATES=new Set(['idle','writing','receiving','replying','researching','executing','syncing','error','thinking','anxious','blocked','done']);
-const TYPES=new Set(['state','task','document','log','service','schedule','agent']);
+const TYPES=new Set(['state','task','document','log','service','schedule','agent','model']);
 function validate(input){
  if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Expected a JSON object');
- if(!TYPES.has(input.type))throw Error('type must be state, task, document, log, service, schedule or agent');
+ if(!TYPES.has(input.type))throw Error('type must be state, task, document, log, service, schedule, agent or model');
  const out={type:input.type,source:'api'};
- for(const [key,max] of Object.entries({subject:100,agent_id:100,agent_name:80,status:40,summary:2000,detail:4000,run_id:100,job_name:160,scheduler:80,scheduled_for:40,started_at:40,finished_at:40,timezone:80,provider:40,tenant_id:150,app_id:150,robot_code:150,conversation_type:20,conversation_id:200,external_subject:200,executor_id:100,message_phase:20,content:8000,task_id:100,message_id:200,delivery_status:20})){
+ for(const [key,max] of Object.entries({subject:100,agent_id:100,agent_name:80,status:40,summary:2000,detail:4000,run_id:100,job_name:160,scheduler:80,scheduled_for:40,started_at:40,finished_at:40,timezone:80,provider:40,tenant_id:150,app_id:150,robot_code:150,conversation_type:20,conversation_id:200,external_subject:200,executor_id:100,message_phase:20,content:8000,task_id:100,message_id:200,delivery_status:20,model_name:120,model_status:20,session_id:200})){
   if(input[key]!==undefined){if(typeof input[key]!=='string'||input[key].length>max||/[\u0000-\u0008]/.test(input[key]))throw Error('Invalid '+key);out[key]=input[key];}
  }
  if(!out.subject||!out.subject.trim())throw Error('subject is required');
@@ -15,6 +15,8 @@ function validate(input){
  if(input.type==='state'){if(!STATES.has(out.status))throw Error('Invalid agent status');out.agent_id=out.subject;}
  if(input.type==='task'){if(!out.agent_id)throw Error('task requires agent_id');if(!['queued','pending','running','done','failed','timeout','archived'].includes(out.status))throw Error('Invalid task status');}
  if(['document','log'].includes(input.type)&&!out.agent_id)throw Error('document/log requires agent_id');
+ if(out.model_status!==undefined&&!['idle','thinking','generating','error','offline'].includes(out.model_status))throw Error('Invalid model_status');
+ if(input.type==='model'&&(!out.session_id?.trim()||!out.model_name?.trim()||!out.model_status))throw Error('model requires session_id, model_name and model_status');
  if(input.type==='service'&&!['up','down','unknown'].includes(out.status))throw Error('Invalid service status');
  for(const [key,min,max,integer] of [['progress',0,100,false],['load',0,100,false],['documents_count',0,12,true],['documents_delta',-12,12,true]]){
   if(input[key]!==undefined){const n=input[key];if(typeof n!=='number'||!Number.isFinite(n)||n<min||n>max||(integer&&!Number.isInteger(n)))throw Error('Invalid '+key);out[key]=n;}

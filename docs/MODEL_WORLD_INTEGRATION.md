@@ -1,0 +1,84 @@
+# 模型机柜与办公室昼夜接入
+
+## 范围与数据真实性
+
+机柜名称只来自 dsh / 执行器实际选择的模型上报，不从机器人名称、进程名、端口或钉钉 sender 推测。这个仓库没有访问生产 dsh 当前会话的权限；升级页面不会自动获得远端模型信息。生产 dsh 桥接程序必须按下面协议接入。没有数据时显示“模型未上报”，没有负载时不伪造百分比。已接实际事件的页面保持实时模式。
+
+## 1. dsh 模型事件
+
+在现有事件入口 POST `/api/town-events`，Content-Type 为 application/json；远程写入继续要求服务端 `TOWN_WRITE_TOKEN` 对应的 Bearer 认证。令牌只放环境变量，不放前端、日志、截图或仓库。原有同源限制、16 KiB 限制和幂等收据保持不变。
+
+```json
+{
+  "type": "model",
+  "subject": "model-session-unique-id",
+  "provider": "dsh",
+  "session_id": "session-unique-id",
+  "agent_id": "configured-agent-id",
+  "model_name": "从当前执行会话读取的实际模型名称",
+  "model_status": "generating",
+  "load": 76
+}
+```
+
+- model 事件必需 subject、session_id、model_name、model_status。model_name 最长 120 字符，session_id 最长 200 字符；agent_id 可省略，但建议填写以区分不同执行器的会话。
+- 状态只接受 idle（闲置）、thinking（思考）、generating（生成）、error（异常）、offline（离线）。不要直接传自然语言 busy 等值。
+- load 可选，0–100，必须来自真实采样；不能用“生成中”直接换算负载。
+- 会话键为 provider + agent_id + session_id。切模型时保持会话键不变，更新 model_name；多个会话独立保存。页面的三个机柜显示最新上报的三个会话，长名称截断，悬停可查看完整名称与会话 ID。
+- 状态为 generating 时冒烟并闪动指示；thinking 显示思考指示；异常显示红色灯带；离线或未上报灯带变暗。有效状态下机箱灯带闪烁；负载超过 80% 时也有繁忙烟雾。
+- 生产端建议每 30 秒上报一次当前状态，且在选定模型、开始推理、生成、完成、失败、断开时立即上报。超过 120 秒没有新事件，页面保留最后模型名，状态改成“状态过期”，停止假繁忙效果。客户端设备时钟需正确。
+- 每次心跳使用新的 Idempotency-Key；同一请求重试保持原 key。不能一直重复同一个 key，否则不会产生新事件。HTTP 202 是排队成功，按返回 status_url 查询 applied；HTTP 200 表示相同事件已经处理。
+
+可复用已有上报器：将上面的 JSON 写入部署环境的临时文件，设置 TOWN_URL、TOWN_WRITE_TOKEN 后执行 `node collector/report.js <临时文件路径>`。请把真实模型选择结果传给上报器，不要照抄示例模型名。
+
+### dsh 桥接位置
+
+1. 收到钉钉消息后保留原有 received、task_id 和 conversation_id 上报。
+2. dsh 为本轮选择模型之后，从实际执行上下文读取会话 ID 和模型名，发送 thinking。
+3. 收到首个生成片段发送 generating，长任务期间每 30 秒心跳。
+4. 成功结束发送 idle；执行失败发送 error；会话退出发送 offline。
+5. 自动降级或用户切换模型时，立即用同一个 session_id 上报新的实际模型名。不要把最初配置的默认模型当成本轮模型。
+6. 继续独立上报角色 state/task 与执行/反馈日志。模型闲置不等于员工下班，模型事件不会创建员工、改变任务状态或自动发钉钉消息。
+
+已有 state/task/log 事件也可携带 model_name、session_id、model_status（建议完整传入）。角色自报 state.json 支持这些模型字段；不过文件采样按变化去重，持续生成的心跳应使用事件入口，不能只重复写相同文件。
+
+使用 `/api/town-dingtalk/events` 的可信桥接也支持 event.type=model，外层继续提供已登记的 tenant_id/app_id/robot_code 与 conversation_type/conversation_id，身份校验不会绕过。该入口的 provider 会被归一为 dingtalk，同一会话请始终使用同一入口，以免变成两条记录。
+
+### 查询与恢复
+
+- GET `/api/town-models`：返回 `{updated, items}`。
+- GET `/api/town-snapshot`：新增 models 数组，兼容旧快照缺失该字段。
+- SSE 继续使用原入口，model 事件与状态携带的模型字段可实时更新机柜。
+- 采集器重启从持久事件恢复，每个会话保存最新值，最多保留 100 个会话；页面重连先读快照，之后接增量事件。
+- 模型名称、会话 ID 也是业务信息，公开部署继续遵守现有入口访问控制；禁止在这些字段中放地址、凭据或用户原文。
+
+## 2. 门、资料与经典书名
+
+角色与环境同事停在资料区查阅时，书本抽出、翻录指示及档案抽屉播放动画；最后一个查阅角色离开后恢复。当前是资料区联动动画，不代表后端真的读取了对应书籍或文件。去查资料的视觉指令和真实 researching 状态均可触发，沿用原有避障路线。
+
+办公室门和资料区门检测附近所有角色（包括环境员工与老板），接近自动打开，离开关闭。门动画不修改寻路网格，以免路径中途失效。
+
+每次重建书架时随机排列书名，每架包含以下四种，不在每帧随机变化。采用短标题和 8–10 SVG 单位字号，悬停显示全名与作者，只画原创书本外形，没有复制书籍封面或正文。核实来源：
+
+- [Mastering Delphi 7 / Marco Cantù](https://www.marcocantu.com/md7/default.htm)
+- [The C++ Programming Language / Bjarne Stroustrup](https://www.stroustrup.com/books.html)
+- [Effective C++ / Scott Meyers，出版社页面](https://www.informit.com/store/effective-c-plus-plus-55-specific-ways-to-improve-your-9780321334879)
+- [Expert Oracle Database Architecture / Thomas Kyte、Darl Kuhn，出版社资料](https://github.com/Apress/exp-oracle-db-architecture)
+
+## 3. 北京时间与夜间行为
+
+- 办公区右上角地图时钟按 Asia/Shanghai 显示 HH:mm:ss，约每 200 ms 刷新；顶部时间与日志仍是北京时间 24 小时制。页面使用设备时间，不是 NTP 校时服务。
+- 每天 20:00（含）到次日 08:00（不含）为夜间。窗口与外部底色变暗，办公室增加暖灯，地图显示“牛马加班中”。08:00 自动恢复白天。
+- 实际角色 idle/done/archived 且无待执行任务、无临时行为时显示“下班”，暂停其自由活动。角色保留在地图和真实名册，任务状态不被改写；不会调用任何真实下班操作。环境角色继续保留生活动画。
+- 夜间收到新的 received 消息，或者下班角色被上报为 running/executing/receiving/writing 时，取消下班外观，头上显示“加班中”怒火 12 秒。实际运行仍以桥接的 state/task 更新为准，received 本身不会伪造 running。
+- 夜间老板每 15 分钟巡视；白天维持 45 分钟。由白天进入夜间时，把尚未到期的巡视最晚调整到 15 分钟后，下一轮计时仍保存在浏览器本地。页面关闭不执行后台巡视，重开后按到期计时处理。
+- 白天每轮选中一名员工进行卡通冲突；夜间在此基础上，其他受访员工有 65% 概率再触发，最多额外 2 次。每次仍按现有 2 秒血条互动，任何一方归零后结束，老板继续按路线巡视并从门口离开。环境员工也在候选范围内。
+- 巡视、下班、怒火、书本、灯光全部属于视觉状态，不影响接口执行、钉钉消息内容、任务日志或真实工作结果。
+
+## 4. 部署与验收
+
+更新后重启 server/start.js 管理的 Web 与采集器，避免两个采集器写同一数据目录；刷新页面。先在受保护的联调环境发送一个明确标注测试的模型事件，核对收据、models 查询、SSE、切模型和两会话独立显示，再接真实 dsh 回调。
+
+建议验收：未上报与过期状态；thinking→generating→idle/error/offline；切模型及重连恢复；角色经过门后复位；查资料/离开恢复；20:00 与 08:00 边界；闲置下班后新任务怒火；夜间巡视频率与额外互动。自动检查执行 `node --test tests/*.test.js`。
+
+截图与本地验收数据的来源见 SCREENSHOTS.md。当前实现不宣称已经接通用户远端生产 dsh，也不会主动向钉钉发送测试消息。

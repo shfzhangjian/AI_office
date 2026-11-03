@@ -124,3 +124,7 @@ node collector/report.js event.json
 ## 数字人会话日志
 
 人物详情已精简为名称、状态、接收到的钉钉原始任务、执行日志与实际反馈内容；按角色/会话/任务隔离，时间统一北京时间24小时制。原始消息、执行和反馈分别使用message_phase=received/execution/reply，上报方式与dsh接入位置详见 [会话日志协议](CONVERSATION_LOGS.md)。
+
+## 模型遥测
+
+新增 type=model，以及 GET `/api/town-models`、快照 models 数组；事件可携带 session_id、model_name、model_status。完整字段、心跳与 dsh 回调接法见 [接入文档](MODEL_WORLD_INTEGRATION.md)。
