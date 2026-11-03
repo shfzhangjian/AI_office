@@ -142,7 +142,7 @@ node --test tests/*.test.js
 
 新版地图、人物及家具由项目SVG代码绘制，代码遵循仓库MIT条款。仓库保留的旧版PNG/WebP素材仍受其原非商用授权约束，不能因新版页面不使用它们就认为全部文件可商用。详见 [LICENSE](LICENSE)。
 
-[介绍视频](video/像素办公室介绍.mp4)和[视频制作说明](docs/VIDEO.md)展示历史版本，不代表当前多人界面；旧Canvas页面存档为frontend/town-legacy.html。
+历史介绍视频因包含运行信息已从当前公开版本移除；[视频制作说明](docs/VIDEO.md)仅保留脚本参考，重新录制时必须使用脱敏数据。旧Canvas页面存档为frontend/town-legacy.html。
 
 ## 环境同事与实际角色的区别
 

@@ -27,3 +27,17 @@ node_modules/
 .DS_Store
 *.log
 *.tmp
+
+# Local identities, credentials and event queues (never commit production values)
+.env
+.env.*
+!.env.example
+roster.json
+inbox/
+*.pem
+*.key
+id_rsa
+id_ed25519
+
+# Historical recording contains operational information; keep the local copy private.
+/video/像素办公室介绍.mp4

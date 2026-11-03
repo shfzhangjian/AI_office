@@ -5,6 +5,6 @@
   ],
   "bots": [
     {"tenant_id":"REPLACE_CORP_ID","app_id":"REPLACE_1030_APP_ID","robot_code":"REPLACE_1030_ROBOT_CODE","agent_id":"zhangjian-1030"},
-    {"tenant_id":"REPLACE_CORP_ID","app_id":"REPLACE_VM_APP_ID","robot_code":"dingxwolvr55q6ixnhev","agent_id":"vm-programmer"}
+    {"tenant_id":"REPLACE_CORP_ID","app_id":"REPLACE_VM_APP_ID","robot_code":"REPLACE_VM_ROBOT_CODE","agent_id":"vm-programmer"}
   ]
 }

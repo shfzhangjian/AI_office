@@ -5,7 +5,7 @@
 Node.js ≥18，无需 npm 依赖。必须同时运行采集器与网页服务：
 
 ```powershell
-$env:TOWN_DIR = "E:/live/AI_office-runtime"
+$env:TOWN_DIR = "E:/example/ai-office-data"
 $env:LT_PORT = "3012"
 $env:COLLECTOR_INTERVAL_MS = "1000"
 node server/start.js

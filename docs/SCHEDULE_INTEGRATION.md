@@ -48,8 +48,8 @@ flowchart LR
 Node.js ≥18，不需要 npm 包。网页服务与采集器必须共享 TOWN_DIR，并且只允许一个采集器写该目录。
 
 ```powershell
-Set-Location E:/live/AI_office
-$env:TOWN_DIR = 'E:/live/AI_office-runtime'
+Set-Location E:/example/AI_office
+$env:TOWN_DIR = 'E:/example/ai-office-data'
 $env:LT_PORT = '3012'
 $env:COLLECTOR_INTERVAL_MS = '1000'
 node server/start.js
@@ -160,7 +160,7 @@ seq、ts、event_id、source 由服务端与采集器生成，不由调用方控
 
 ```powershell
 $env:TOWN_URL = 'http://127.0.0.1:3012'
-node E:/live/AI_office/collector/run-scheduled.js --job-id daily-report --name '每日经营日报' --agent-id report-agent --scheduler windows-task-scheduler -- node E:/jobs/daily-report.js
+node E:/example/AI_office/collector/run-scheduled.js --job-id daily-report --name '每日经营日报' --agent-id report-agent --scheduler windows-task-scheduler -- node E:/jobs/daily-report.js
 ```
 
 参数：
@@ -193,7 +193,7 @@ cron 的时区和工作目录由部署环境决定。需要固定计划时刻时
 在原任务的操作中配置：
 
 - 程序：本机 node.exe 的绝对路径。
-- 参数：`E:/live/AI_office/collector/run-scheduled.js --job-id daily-report --name 日报 --agent-id report-agent --scheduler windows-task-scheduler -- C:/Program Files/nodejs/node.exe E:/jobs/daily-report.js`。
+- 参数：`E:/example/AI_office/collector/run-scheduled.js --job-id daily-report --name 日报 --agent-id report-agent --scheduler windows-task-scheduler -- C:/Program Files/nodejs/node.exe E:/jobs/daily-report.js`。
 - 实际路径带空格时，在任务参数界面为该路径加双引号，例如 `"C:/Program Files/nodejs/node.exe"`。
 - 起始位置：业务任务需要的工作目录。
 - TOWN_URL/TOWN_WRITE_TOKEN：通过任务用户环境或受保护的启动脚本配置，不把令牌写到截图或日志。

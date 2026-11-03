@@ -1,155 +1,57 @@
-# 🚀 部署与对齐运行手册（DEPLOY）
+# 部署与运行手册
 
-> 目标：**git 仓库 = 唯一代码源，运行态 = 本手册描述的那套 pm2 进程**。
-> 日常"按仓库更新线上"只需一条命令；数据、事件账、素材授权始终不变。
+本文只使用通用示例，不记录生产服务器IP、域名、真实目录、拓扑或服务清单。具体配置放在服务器本地运行目录，不提交Git。
 
----
-
-## 一、这套系统现在由什么构成
-
-代码全部来自本仓库；线上运行只是「仓库脚本 + 一组环境变量」的实例化。
-
-| 进程（pm2 名） | 跑的脚本 | 端口 | 数据写到 | 反代入口 |
-|---|---|---|---|---|
-| `town-server` | `server/town-server.js` | 3002 | 读 `~/town/` | caddy `:3004 → 127.0.0.1:3002` |
-| `town-collector` | `collector/collectord.js` | — | 写 `~/town/events.jsonl` | 外网 cloudflared（独立进程 `town-tunnel`） |
-| （入口）`town_state.sh` | `~/.local/bin/town_state.sh` → 转发到 `collector/town_state.sh` | — | 写 `~/town/state.json` | — |
-
-**关键点**：数据目录仍是 `~/town`（不是仓库默认的 `~/ai-office-town`）。是 pm2 进程的环境变量把它桥接回去的——见下面的 ecosystem。数据零迁移，历史事件账完整保留、`seq` 连续。
-
----
-
-## 二、环境桥接：一份 ecosystem 文件锁死所有指向
-
-线上运行配置在 **`~/town/town-ecosystem.json`**（在数据目录、**不进 git**，因为它含本机绝对路径）。它给两个进程注入环境变量：
-
-```jsonc
-// town-server
-LT_PORT=3002  LT_HOST=127.0.0.1
-TOWN_DIR=~/town  TOWN_ROSTER=~/town/roster.json
-TOWN_DEFAULT_AGENT_ID=zhangjian-1030  # 按实际旧任务归属填写
-# 不设置 TOWN_ALLOW_DEMO；若显式设置TOWN_HTML，确认其指向仓库新版
-// （素材目录不写 → 默认取仓库 frontend/assets）
-
-// town-collector
-TOWN_DIR=~/town
-DTASK_DIR=~/dsh-dingtalk-workspace/dtask/tasks   // 线上真实任务目录
-GUARD_LOG=~/.dsh/web-guard.log                    // 线上守护日志
-TUNNEL_LOG=/tmp/luck-tunnel.log                   // 线上隧道日志
-HB_PORTS=model:11234,dsh:3080,panel:3000          // 线上心跳端口
-```
-
-> 换机器 / 换端口 / 换采集源，**只改这个 ecosystem 文件**，不碰仓库代码。
-> `town_state.sh` 同理：线上入口 `~/.local/bin/town_state.sh` 是个薄包装，`exec env TOWN_DIR=~/town bash <仓库>/collector/town_state.sh`。
-
-`HB_PORTS` 等采集源也可不写进 ecosystem、直接 `export` 后再 `pm2 restart --update-env`；写在文件里只是为了可复现。
-
----
-
-## 三、日常：按仓库更新当前运行的（核心，就一条）
+## 单机启动
 
 ```bash
-# 1) 取最新代码
-cd ~/dsh-dingtalk-workspace/AI_office
+cd /srv/ai-office
+TOWN_DIR=/var/lib/ai-office LT_HOST=127.0.0.1 LT_PORT=3002 node server/start.js
+```
+
+Windows示例见README。只允许一个采集器写同一TOWN_DIR。默认监听回环地址；这并不能替代公网入口鉴权，反向代理或隧道可能把外部请求转为本机请求。
+
+## PM2部署
+
+可分别管理server/town-server.js和collector/collectord.js，两边使用一致的TOWN_DIR/TOWN_ROSTER。具体ecosystem文件保存在Git目录之外，使用本机真实路径，不向公共文档复制生产配置。已经独立运行采集器时，不要再用server/start.js启动第二个。
+
+更新：
+
+```bash
 git pull --ff-only
-
-# 2) 重启两个进程拉新代码（--update-env 让 ecosystem 的 env 重新注入）
-pm2 startOrRestart ~/town/town-ecosystem.json --update-env
-
-# 3) 看一眼没崩（restarts 别再涨、无 error 日志）
-pm2 list | grep town-
-pm2 logs town-server --nostream --lines 5
+pm2 restart <本地网页进程名> <本地采集进程名> --update-env
 ```
 
-**重启会短暂中断服务**：`town-server` 重启期间页面短暂 502，`autorestart` 立刻拉起；`town-collector` 重启不丢账（seq 从 `events.jsonl` 末尾续）。前端 `frontend/town.html` 和 `frontend/assets/*` 是**静态即时生效**的——改了甚至不用重启，刷新页面即可（town-server 每次请求现读文件）。
+重启有短暂中断，应先备份运行目录并确认环境配置。页面默认优先仓库frontend/town.html，显式TOWN_HTML可覆盖，部署时确认未指向旧页面。
 
-### 只想更新前端某处？
-改 `frontend/town.html` → 刷新浏览器，**不用重启任何进程**。
+## 本地配置
 
-### 只想改采集源（加/减监控的服务）？
-不用改代码。改 `ecosystem` 里 `HB_PORTS`，或临时：
-```bash
-HB_PORTS="model:11234,dsh:3080,panel:3000,newsvc:9000" \
-  pm2 restart town-collector --update-env
-```
+- TOWN_DIR：运行数据路径，仓库外保存。
+- TOWN_ROSTER：角色/机器人绑定文件，不包含应用密钥，不提交生产值。
+- TOWN_DEFAULT_AGENT_ID：仅用于明确归属的旧任务。
+- DTASK_DIR、GUARD_LOG、TUNNEL_LOG、HB_PORTS：本机采集源，不要把实际路径与服务清单贴到公开仓库。
+- TOWN_WRITE_TOKEN：远程写入鉴权，放受保护环境配置中。
+- TOWN_ALLOW_DEMO：生产不设置；真实数据接入后页面禁用演示。
 
----
+## 公网边界
 
-## 四、首次在新机器上跑起来
+读取接口目前默认无应用内登录保护。/api/town-snapshot、事件SSE、角色/服务/绑定查询，以及配置后的日志流，可能返回任务文本、运行状态、会话身份和原始日志。公网发布必须在反向代理/访问网关保护页面、所有/api路径及SSE，不能只保护POST写入。
 
-```bash
-git clone https://github.com/shfzhangjian/AI_office.git
-cd AI_office
+隧道地址不得写入公开事件摘要或录制素材；不要把无鉴权日志流直接开放。审计日志应避免保存token、sessionWebhook及完整业务数据。
 
-# 想要"开箱看效果"，直接对 samples 跑：
-TOWN_DIR=$(pwd)/samples node server/town-server.js      # http://127.0.0.1:3002/town
-node collector/collectord.js                            # 接自己的采集源
+## 验证
 
-# 要常驻：把 ecosystem 里的绝对路径换成新机器路径，然后
-pm2 start <你的>/town-ecosystem.json && pm2 save
-```
-
-依赖：Node ≥ 18（服务端零 npm 依赖）；采集器用到 `pm2 jlist`（可选，缺了自动跳过进程采集）；天气可通过 `node collector/weather.js` 周期刷新缓存；旧天气脚本仍依赖curl与python3。
-
----
-
-## 五、回退
-
-切换前的旧文件都留了备份，任一步出问题可回退：
-
-| 退役的旧物 | 备份位置 |
-|---|---|
-| 旧 `logs-tails.js` / `collectord.js` / `town.html` / `weather.sh` / `town_state.sh` | `~/.pm2-dashboard/town-align-backup-*/` |
-| 旧前端页 | `~/town/town.html.pre-align.bak` |
-| 旧素材目录（若新素材有问题） | `~/.pm2-dashboard/town-assets/`（未删，可临时 `TOWN_ASSETS` 指回去） |
-
-一键回退到对齐前：
-```bash
-# 停掉仓库版进程
-pm2 delete town-server town-collector
-# 旧服务脚本仍在 ~/.pm2-dashboard/logs-tails.js（未动）；旧采集脚本从备份还原
-cp ~/.pm2-dashboard/town-align-backup-*/collectord.js.bak ~/town/collectord.js
-cp ~/.pm2-dashboard/town-align-backup-*/town.html.bak      ~/town/town.html   # 恢复旧前端页
-pm2 start ~/.pm2-dashboard/logs-tails.js --name logs-tails
-pm2 start ~/town/collectord.js        --name town-collector
-# 旧 logs-tails 默认读 ~/town/town.html（已还原）、素材走 ~/.pm2-dashboard/town-assets（未删）
-pm2 save
-```
-（旧前端页备份在 `~/.pm2-dashboard/town-align-backup-*/town.html.bak`，也可从 `~/town/town.html.pre-align.bak` 取。）
-
----
-
-## 六、健康自检清单
+在已授权的内网或本机检查：
 
 ```bash
-# 1) 谁在 3002 LISTEN，应是 town-server
-lsof -nP -iTCP:3002 -sTCP:LISTEN | grep -v COMMAND
-# 2) 端到端
-for ep in /town /api/town-snapshot /api/town-weather /town-assets/office_bg.webp; do
-  printf "%-32s %s\n" "$ep" "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3002$ep)"; done
-# 3) 反代
-curl -sk -o /dev/null -w '%{http_code}\n' https://127.0.0.1:3004/town
-# 4) 采集器没写错地方、账在长
-[ -d ~/ai-office-town ] && echo "⚠️写错目录了" || echo "✓ 写 ~/town"
-tail -1 ~/town/events.jsonl | python3 -c "import json,sys;e=json.load(sys.stdin);print('seq',e['seq'],e['ts'])"
-# 5) 页面包含新版北京时间格式化逻辑
-curl -s http://127.0.0.1:3002/town | grep -q "beijingTime" && echo "✓ 仓库新版页"
-# 6) 核对独立角色注册与快照
-curl -s http://127.0.0.1:3002/api/town-agents
+curl -f http://127.0.0.1:3002/town
+curl -f http://127.0.0.1:3002/api/town-agents
 ```
 
----
+还需从未登录的外部客户端验证入口确实拒绝访问，包括SSE和日志接口。本仓库无法代替对实际生产网关配置的检查。
 
-## 七、"按仓库更新"的边界（重要）
+## 时间、天气与截图
 
-- **会随 `git pull` 更新的**：`server/town-server.js`、`collector/collectord.js`、`collector/weather.sh`、`collector/town_state.sh`、`frontend/town.html`、`frontend/assets/*`。改完这些并提交、`pm2 startOrRestart --update-env`，线上即生效。
-- **不会、也不应被仓库覆盖的**（都是本机运行态）：`~/town/events.jsonl`、`snapshot.json`、`state.json`、`weather.json`（数据/账本），`~/town/town-ecosystem.json`（本机 env），`~/.local/bin/town_state.sh`（薄包装）。仓库的 `.gitignore` 已排除这些文件名，即便误提交进 `samples/` 也不会污染。
-- 因此可以安全地 `git pull` + 重启，而不必担心丢历史事件账。
+所有界面时间为北京时间24小时制。天气缓存可用node collector/weather.js周期刷新。README主截图只使用联调数据。历史介绍视频因包含运行信息已退出当前公开版本；历史提交中的副本仍需要另行处理。
 
-## 八、新版生产展示与时间设置
-
-1. 服务端默认优先frontend/town.html，运行目录中的旧town.html不再抢占新版。检查并移除指向旧页面的TOWN_HTML显式覆盖。
-2. 不设置TOWN_ALLOW_DEMO，默认无演示模式入口；已接入数据时，旧?demo=1链接也不会切回演示。开发者显式开启演示后，实际事件到达会自动锁回真实模式。
-3. 顶部时钟、角色时间线、定时记录统一为北京时间24小时制，无需修改主机或浏览器时区，午夜显示00:00:00。
-4. 钉钉双角色必须使用同一roster配置，并确保任务带正确agent_id或机器人三元组。旧me历史不自动迁移，详见DINGTALK_MULTI_BOT.md。
-5. 历史介绍视频和旧截图属于旧版资料，当前页面外观以README最新截图为准。
+回滚时只恢复已审核的代码版本，不用旧版无鉴权网页/原始生产日志作为公开演示素材。运行账本、配置、密钥和备份均应留在本地受控目录。

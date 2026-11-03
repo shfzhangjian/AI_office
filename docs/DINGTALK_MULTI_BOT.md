@@ -24,7 +24,7 @@ senderId、senderNick、群名、用户ID均不用于推断角色。原始回调
 
 ## 2. 配置角色与机器人绑定
 
-复制 config/roster.example.json 到运行目录 roster.json，或使用 TOWN_ROSTER 指向独立配置文件。示例中两个角色名称已填写；1030机器人编码、企业ID与应用ID均是占位符，必须换成真实值。bot2编码来自用户提供的信息，仍需与实际应用配置核对。
+复制 config/roster.example.json 到运行目录 roster.json，或使用 TOWN_ROSTER 指向独立配置文件。示例中两个角色名称已填写；1030机器人编码、企业ID与应用ID均是占位符，必须换成真实值。bot2编码也使用占位符，需与实际应用配置核对。
 
 ```json
 {
@@ -34,7 +34,7 @@ senderId、senderNick、群名、用户ID均不用于推断角色。原始回调
   ],
   "bots": [
     {"tenant_id":"实际企业ID","app_id":"1030实际应用ID","robot_code":"1030实际机器人编码","agent_id":"zhangjian-1030"},
-    {"tenant_id":"实际企业ID","app_id":"虚拟机实际应用ID","robot_code":"dingxwolvr55q6ixnhev","agent_id":"vm-programmer"}
+    {"tenant_id":"实际企业ID","app_id":"虚拟机实际应用ID","robot_code":"REPLACE_VM_ROBOT_CODE","agent_id":"vm-programmer"}
   ]
 }
 ```
@@ -46,8 +46,8 @@ senderId、senderNick、群名、用户ID均不用于推断角色。原始回调
 ## 3. 启动与兼容旧配置
 
 ```powershell
-$env:TOWN_DIR = 'E:/live/AI_office-runtime'
-$env:TOWN_ROSTER = 'E:/live/AI_office-runtime/roster.json'
+$env:TOWN_DIR = 'E:/example/ai-office-data'
+$env:TOWN_ROSTER = 'E:/example/ai-office-data/roster.json'
 $env:TOWN_DEFAULT_AGENT_ID = 'zhangjian-1030'
 $env:LT_PORT = '3012'
 node server/start.js
@@ -83,7 +83,7 @@ PM2部署仍可分别运行网页和采集器，只需两边使用同一 TOWN_DI
 {
   "tenant_id":"实际企业ID",
   "app_id":"虚拟机实际应用ID",
-  "robot_code":"dingxwolvr55q6ixnhev",
+  "robot_code":"REPLACE_VM_ROBOT_CODE",
   "conversation_type":"direct",
   "conversation_id":"实际单聊会话ID",
   "event":{
