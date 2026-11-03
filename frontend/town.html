@@ -1,272 +1,68 @@
 <!doctype html>
-<html lang="zh">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>我的像素办公室</title>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI OFFICE · 像素办公室</title>
 <style>
-:root{--paper:#f2ecd8;--ink:#2a2318;--line:#c9c0a4;}
-*{box-sizing:border-box}
-body{margin:0;font-family:"PingFang SC","Hiragino Sans GB",sans-serif;background:#171512;color:var(--ink)}
-header{display:flex;align-items:center;gap:14px;padding:10px 16px;background:#1f1c17;border-bottom:2px solid #3a352b;flex-wrap:wrap}
-h1{font-size:17px;margin:0;color:#e8dfc0;letter-spacing:1px}
-#clock{font-size:12px;color:#8a815f}
-#memo{font-size:12px;color:#b0a67e}
-#weather{font-size:13px;font-weight:600;margin-left:auto;color:#e8dfc0}
-main{display:flex;gap:14px;padding:14px;flex-wrap:wrap;justify-content:center}
-#office{flex:0 1 860px;background:#000;border:3px solid #3a352b;border-radius:10px;overflow:hidden;position:relative}
-canvas{display:block;width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges}
-#statebar{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.75));color:#f0e8c8;padding:18px 16px 10px;font-size:14px;font-weight:700;text-shadow:0 1px 2px #000;pointer-events:none}
-#statebar small{font-weight:400;color:#c8bd94}
-#feed{flex:1 1 320px;max-height:600px;display:flex;flex-direction:column;background:#f2ecd8;border:2px solid #57503c;border-radius:10px;padding:10px}
-h2{font-size:13px;margin:0 0 8px;color:#6a6142;font-family:ui-monospace,Menlo,monospace}
-#events{overflow:auto;flex:1;font-size:12px;font-family:ui-monospace,Menlo,monospace;color:#3a3222}
-.ev{padding:3px 2px;border-bottom:1px dashed #d5cbab;display:flex;gap:6px;align-items:baseline}
-.ev .t{color:#9a9170;flex-shrink:0}
-.ev .s{font-weight:700;flex-shrink:0}
-.ok .s{color:#2f7f2f}.err .s{color:#a33323}.warn .s{color:#a37707}.run .s{color:#2b5aa0}.info .s{color:#665}
-#toast{position:fixed;left:14px;bottom:14px;background:#2a2318;color:#f2ecd8;padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .5s;z-index:9;max-width:70vw}
-footer{width:100%;text-align:center;color:#6a6250;font-size:11px;padding:0 10px 14px}
-#loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#e8dfc0;background:#171512;font-size:14px;letter-spacing:2px}
+:root{--ink:#22324a;--paper:#f6f2e9;--green:#447e60;--line:#c8cecd}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:"Microsoft YaHei",sans-serif}header{background:#202f49;color:white;padding:18px 26px;display:flex;gap:20px;align-items:center;flex-wrap:wrap}h1{font-size:22px;margin:0;letter-spacing:2px}header span{font-size:12px;color:#c9d8d9}header time{margin-left:auto;font-size:13px}nav{padding:16px 24px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}button,select{font:inherit;font-size:13px;padding:9px 13px;border:1px solid #adb9b5;border-radius:5px;background:#fff;color:var(--ink);cursor:pointer}button:hover,button:focus-visible{border-color:var(--green);outline:2px solid #a9ccae}button.active{background:var(--green);color:white}.workspace{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:18px;padding:0 24px}.map-wrap{min-width:0}.zones{display:grid;grid-template-columns:7fr 3fr;gap:0;padding-bottom:12px;text-align:center;font-size:15px;font-weight:bold}.zones span{padding:8px;border-bottom:3px solid #7f9d83}.zones span+span{border-color:#8795aa}svg#map{display:block;width:100%;border:5px solid #57677a;border-radius:5px;background:#dfc19b;image-rendering:pixelated}aside{background:#fffdf8;border:1px solid #afb9be;border-radius:7px;padding:20px;min-width:0}h2{font-size:19px;margin:0 0 22px}h3{font-size:14px;margin:22px 0 10px}.name{font-size:25px;font-weight:bold}.chip{display:inline-block;background:#e1eddd;color:#376443;padding:5px 9px;font-size:12px;border-radius:4px;margin:10px 0}p{line-height:1.8;font-size:13px}#history{padding-left:18px;font-size:12px;line-height:2;color:#64717d}progress{width:100%;accent-color:#609653}#feed{font-size:12px;line-height:1.8;color:#65717b;max-height:150px;overflow:auto}.legend{margin:18px 24px;padding:15px 18px;background:#fffdf8;border:1px solid #d0d0c5;display:flex;gap:20px;flex-wrap:wrap;font-size:12px}.legend b{color:#426e55}footer{padding:0 24px 20px;font-size:12px;color:#758077}.agent{cursor:pointer;outline:none}.agent:focus .selection{stroke:#287b65;stroke-width:3}.selection{fill:none;stroke:transparent;stroke-width:2}.agent.selected .selection{stroke:#66b995}.route{fill:none;stroke:#65d49c;stroke-width:3;stroke-dasharray:5 5;pointer-events:none}.smoke{animation:smoke 1.7s infinite}.lamp{animation:lamp 1s steps(2) infinite}.typing .paw{animation:type .3s steps(2) infinite}.typing .right{animation-delay:.15s}.resting .head{animation:breathe 2s infinite}.happy .head{animation:happy .7s infinite}.anxious .badge{animation:lamp .4s infinite}@keyframes smoke{to{transform:translateY(-16px);opacity:0}}@keyframes lamp{50%{opacity:.25}}@keyframes type{50%{transform:translateY(-3px)}}@keyframes breathe{50%{transform:translateY(2px)}}@keyframes happy{50%{transform:translateY(-3px)}}@media(prefers-reduced-motion:reduce){*{animation:none!important}}@media(max-width:1000px){.workspace{grid-template-columns:1fr}aside{display:grid;grid-template-columns:1fr 1fr;gap:0 25px}.map-wrap{overflow:auto}svg#map{min-width:720px}}@media(max-width:550px){.workspace{padding:0 10px}aside{display:block}nav{padding:12px 10px}.legend{margin:12px 10px}}
 </style>
-</head>
-<body>
-<div id="snowfx" style="position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:8"></div>
-<header>
-  <h1>🕹️ 我的像素办公室</h1><span id="clock">…</span><span id="memo"></span><span id="weather">天气…</span>
-</header>
-<main>
-  <div id="office">
-    <div id="loading">正在掀开地板铺像素…</div>
-    <canvas id="cv" width="1280" height="720"></canvas>
-    <div id="statebar"><span id="sbText">💤 idle · 待命中</span> <small id="sbSeq"></small></div>
-  </div>
-  <section id="feed">
-    <h2>▸ 镇情快报（事件流）</h2>
-    <div id="events"></div>
-  </section>
-</main>
-<footer>像素素材 © Star-Office-UI（ringhyacinth & Simon Lee，代码 MIT / 素材仅非商用学习）· Guest 角色 © LimeZu · 状态管道 collectord + SSE · 事件底账 TOWN_DIR/events.jsonl</footer>
-<div id="toast"></div>
-
+<header><h1>▦ AI OFFICE / 像素办公室</h1><span id="connection">正在连接实时事件…</span><time id="clock"></time></header>
+<nav><button id="live" class="active">实时模式</button><button id="demo">演示模式</button><label>工位 <select id="desks"><option>6</option><option>9</option><option>12</option><option>18</option></select></label><button id="add">＋ 添加演示角色</button><button id="paths" aria-pressed="true">隐藏路线</button><button id="pause" aria-pressed="false">暂停动画</button><span id="notice" role="status" style="font-size:12px;color:#617365">点击人物查看工作内容</span></nav>
+<div class="workspace"><section class="map-wrap" aria-label="办公室地图"><div class="zones"><span>办公区 · 70%</span><span>资料与服务区 · 30%</span></div><svg id="map" viewBox="0 0 1000 680" role="img" aria-label="可交互像素办公室"><defs><pattern id="wood" width="50" height="20" patternUnits="userSpaceOnUse"><rect width="50" height="20" fill="#ddbc95"/><path d="M0 19H50M49 0V20" stroke="#ceaa83" stroke-width="1"/></pattern><pattern id="tile" width="25" height="25" patternUnits="userSpaceOnUse"><rect width="25" height="25" fill="#b9c3cb"/><path d="M0 25V0H25" fill="none" stroke="#a5b1bb"/></pattern></defs><g id="room"></g><g id="furniture"></g><g id="routes"></g><g id="people"></g><g id="servers"></g></svg></section><aside aria-live="polite"><h2>角色工作详情</h2><div><div class="name" id="name">等待角色上报</div><span class="chip" id="status">未知</span><h3>当前任务</h3><p id="task">实时模式仅展示实际上报的数据，可切换演示查看完整行为。</p><h3>当前步骤</h3><p id="step">—</p><progress id="progress" max="100" value="0" hidden></progress><p id="percent">进度未上报</p><h3>任务时间线</h3><ol id="history"></ol><button id="follow">显示行走路线</button></div><div><h3>事件动态</h3><div id="feed">等待事件</div></div></aside></div>
+<div class="legend"><b>人物动作</b><span>⌨ 打字</span><span>？思考</span><span>！着急</span><span>… 为难</span><span>✦ 完成开心</span><span>· 等待</span><span>→ 沿通道行走</span><span>z 沙发休息</span><b>服务器</b><span>灰：负载未知</span><span>绿：正常</span><span>红＋蒸汽：繁忙</span></div><footer>地图左右区域固定 7:3 · 人物与家具为项目原创 SVG · 演示数据与真实事件隔离 · 路线自动避开家具 · <span id="modeLabel">实时模式</span></footer>
 <script>
-const $ = id => document.getElementById(id);
-const A = '/town-assets/';
-const STATUS_CLASS = { done:'ok', up:'ok', online:'ok', ok:'ok', running:'run', failed:'err', timeout:'err', down:'err', offline:'err', warn:'warn', note:'info', writing:'run', executing:'run', researching:'run', syncing:'run', receiving:'info', replying:'info', idle:'info', error:'err' };
-
-// ===== 精灵加载与网格动画 =====
-function loadImg(src){ return new Promise((res,rej)=>{const i=new Image();i.crossOrigin='anonymous';i.onload=()=>res(i);i.onerror=rej;i.src=src;}); }
-const SPR = {};           // name -> {img, fw, fh, cols, rows, count}
-function grid(img, fw, fh, count){ const cols=Math.round(img.width/fw); return {img, fw, fh, cols, count}; }
-let seqCounter = 0;
-
-async function loadAll(){
-  const jobs = [
-    loadImg(A+'office_bg.webp').then(i=>SPR.bg=i),
-    loadImg(A+'desk-v3.png').then(i=>SPR.desk=i),
-    loadImg(A+'sofa-idle-v3.png').then(i=>SPR.sofa=i),
-    loadImg(A+'plants-spritesheet.png').then(i=>SPR.plants=grid(i,160,160,16)),
-    loadImg(A+'posters-spritesheet.png').then(i=>SPR.posters=grid(i,160,160,16)),
-    loadImg(A+'cats-spritesheet.png').then(i=>SPR.cats=grid(i,160,160,16)),
-    loadImg(A+'serverroom-spritesheet.png').then(i=>SPR.servers=grid(i,180,251,40)),
-    loadImg(A+'flowers-bloom-v2.png').then(i=>SPR.flowers=i),
-    // Project-owned SVG cat: identical character across all work states.
-    ...['idle','typing-left','typing-right','blink'].map(pose=>
-      loadImg(A+'office-cat-'+pose+'.svg').then(i=>SPR['cat-'+pose]=i)),
-    loadImg(A+'sync-animation-v3-grid.png').then(i=>SPR.syncing=grid(i,256,256,49)),
-  ];
-  await Promise.allSettled(jobs);
-  $('loading').style.display='none';
+'use strict';
+const $=id=>document.getElementById(id),NS='http://www.w3.org/2000/svg';
+function svg(tag,attrs={},parent){const e=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(parent)parent.append(e);return e}
+function rect(p,x,y,w,h,fill,extra={}){return svg('rect',{x,y,width:w,height:h,fill,...extra},p)}
+function text(p,x,y,value,size=12,fill='#33445a'){const t=svg('text',{x,y,'font-size':size,fill,'text-anchor':'middle','font-family':'Microsoft YaHei, sans-serif'},p);t.textContent=value;return t}
+const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||false;
+let capacity=6,rows=2,height=680,obstacles=[],seats=[],agents=[],selected=null,mode='live',showPaths=true,paused=false,lastTime=0,lastSeq=0,source=null,reconnect=null;
+const labels={writing:'打字中',executing:'执行任务',researching:'查阅资料',thinking:'思考中',anxious:'着急',blocked:'为难',done:'完成 · 开心',idle:'等待',resting:'沙发休息',walking:'行走',syncing:'同步资料',receiving:'接收任务',replying:'回复中',error:'任务异常'};
+const palette=['#6499b6','#db9a61','#8fa870','#ad85ad','#d77f80','#7baaaa'];
+function block(x,y,w,h){obstacles.push({x,y,w,h})}
+function plant(p,x,y){rect(p,x-11,y,22,18,'#a97859');rect(p,x-15,y-4,30,6,'#d6af87');for(const [dx,dy]of [[-12,-25],[0,-34],[10,-23],[-4,-17]]){rect(p,x+dx-6,y+dy,13,18,'#4c7956');rect(p,x+dx-3,y+dy,5,13,'#81a365')}block(x-20,y-40,40,60)}
+function rebuild(){
+ rows=Math.ceil(capacity/3);height=rows*160+360;obstacles=[];seats=[];
+ $('map').setAttribute('viewBox',`0 0 1000 ${height}`);for(const id of ['room','furniture','routes','people','servers'])$(id).replaceChildren();
+ const room=$('room'),f=$('furniture');rect(room,0,0,700,height,'url(#wood)');rect(room,700,0,300,height,'url(#tile)');
+ const door=250;rect(room,695,0,10,door-35,'#586b7b');rect(room,695,door+35,10,height-door-35,'#586b7b');block(695,0,10,door-35);block(695,door+35,10,height-door-35);
+ text(room,350,27,'WORKSPACE / 工作与协作',13);text(room,850,27,'RESOURCE / 资料与服务',12);
+ for(let i=0;i<capacity;i++){const x=40+(i%3)*215,y=80+Math.floor(i/3)*160;seats.push({x:x+80,y:y+35});block(x,y+48,160,64);rect(f,x+64,y+22,35,30,'#687887');rect(f,x,y+48,160,64,'#825a40');rect(f,x+3,y+48,154,53,'#d5a36e');rect(f,x+12,y+111,7,14,'#675245');rect(f,x+142,y+111,7,14,'#675245');rect(f,x+45,y+39,70,39,'#293c52');rect(f,x+49,y+43,62,30,'#617f93');rect(f,x+76,y+78,8,8,'#3c4f60');rect(f,x+55,y+88,56,8,'#e8d9b4');text(f,x+80,y+109,'工位 '+String(i+1).padStart(2,'0'),9);}
+ const lounge=height-115;rect(f,35,lounge-20,290,100,'#eadfc2');rect(f,42,lounge-13,276,86,'none',{stroke:'#849779','stroke-dasharray':'4 3','stroke-width':3});rect(f,75,lounge-5,185,60,'#4b7556');rect(f,84,lounge+4,167,40,'#83a172');rect(f,71,lounge+8,18,49,'#638660');rect(f,247,lounge+8,18,49,'#638660');block(70,lounge-8,200,68);plant(f,45,lounge+55);plant(f,305,lounge+55);
+ for(let i=0;i<2;i++){const x=735+i*120;rect(f,x,65,105,135,'#785640');rect(f,x+6,70,93,122,'#c49d73');for(let r=0;r<3;r++){for(let b=0;b<7;b++)rect(f,x+10+b*12,78+r*37,8,26,['#5c889b','#b67659','#85986e'][b%3]);rect(f,x+5,107+r*37,95,5,'#785640')}block(x,65,105,135)}
+ for(let i=0;i<2;i++){rect(f,745+i*113,310,94,105,'#8d9ca5');for(let r=0;r<3;r++){rect(f,751+i*113,317+r*31,82,26,'#d4d9d4');rect(f,781+i*113,325+r*31,22,4,'#74848d')}block(745+i*113,310,94,105)}
+ for(let i=0;i<3;i++)block(735+i*83,height-190,68,120);
+ rect(f,745,height-45,200,25,'#ded9be');plant(f,965,285);
+ for(const a of agents){a.path=[];a.x=seats[a.seat%capacity].x;a.y=seats[a.seat%capacity].y;a.destination='desk';a.node=null;}renderServers();renderAgents();
 }
-
-// ===== 状态 → 动画 + 站位（layout.js 的坐标）=====
-const AREAS = {
-  writing:{x:368,y:554}, executing:{x:368,y:554}, researching:{x:520,y:340}, replying:{x:430,y:400},
-  receiving:{x:640,y:400}, syncing:{x:1000,y:470}, error:{x:1050,y:300}, idle:{x:660,y:400}
-};
-const ANIM_OF = { writing:'writing', executing:'writing', researching:'idle', syncing:'syncing', error:'error', idle:'idle', receiving:'idle', replying:'idle' };
-const STATE_LABEL = { idle:'💤 摸鱼待命', writing:'✍️ 输出中', receiving:'📥 收消息', replying:'💬 回复中', researching:'🔎 调研中', executing:'⚡ 执行任务', syncing:'☁️ 同步中', error:'🔴 出错了' };
-
-let selfState='idle', selfDetail='', animFrame=0, lastTick=0, walkFrom=null, walkTo=null, walkT=0;
-let starPos={...AREAS.idle};
-function setSelf(state, detail){
-  if (state===selfState && (detail||'')===selfDetail) return;
-  selfState=state; selfDetail=detail||'';
-  $('sbText').textContent = (STATE_LABEL[state]||state) + (detail?' · '+detail.slice(0,40):'');
-  const t = AREAS[state]||AREAS.idle;
-  walkFrom={...starPos}; walkTo=t; walkT=0;
-}
-
-// ===== 事件流 =====
-const evbox = $('events'); let lastSeq = 0;
-function addEv(e, pre){
-  const d = document.createElement('div');
-  d.className = 'ev ' + (STATUS_CLASS[e.status]||'info');
-  const t = new Date(e.ts);
-  const fields = [['t',t.toLocaleTimeString('zh-CN',{hour12:false})],['s',e.status],['',`${e.source}/${e.subject} ${String(e.summary||'').slice(0,60)}`]];
-  for(const [cls,value] of fields){const span=document.createElement('span');span.className=cls;span.textContent=value;d.appendChild(span);}
-  pre ? evbox.appendChild(d) : evbox.prepend(d);
-  while (evbox.children.length > 300) evbox.removeChild(evbox.lastChild);
-}
-function toast(msg){ const t=$('toast'); t.textContent=msg; t.style.opacity=1; setTimeout(()=>t.style.opacity=0,5000); }
-
-const svc = { model:true, pm2:true };
-const services = {};
-function paint(e){
-  if (e.type==='state'){ setSelf(e.status, e.summary); if(e.status==='error') toast('🔴 '+ (e.summary||'我卡住了')); return; }
-  if(e.type==='heartbeat' || e.type==='process') services[`${e.source}:${e.subject}`]=e.status;
-  if(e.type==='heartbeat' && ['model','local-llm'].includes(e.source)) svc.model=e.status==='up';
-  svc.pm2=Object.entries(services).filter(([key])=>key.startsWith('pm2:')).every(([,status])=>status==='online');
-}
-
-function connect(){
-  const es = new EventSource('/api/town-events?after='+lastSeq);
-  es.onmessage = m => { const e=JSON.parse(m.data); if(e.seq<=lastSeq)return; lastSeq=e.seq; addEv(e); paint(e);
-    $('sbSeq').textContent = '· 第 '+e.seq+' 手';
-    if (e.type==='task'&&e.status==='done') toast('🌾 收成！'+(e.summary||e.subject));
-    if (e.type==='task'&&(e.status==='failed'||e.status==='timeout')) toast('🥀 '+(e.summary||e.subject)+' '+e.status); };
-  es.onerror = () => { es.close(); setTimeout(connect, 5000); };
-}
-// Connect after snapshot initialization to avoid stale state replay.
-
-// ===== 绘制循环 =====
-const cv = $('cv'), ctx = cv.getContext('2d');
-function drawGridSprite(g, x, y, scale, fps, offsetFrames){
-  const total = g.count; const f = (Math.floor(animFrame/ (60/Math.max(fps,1))) + (offsetFrames||0)) % total;
-  const col = f % g.cols, row = Math.floor(f/g.cols);
-  ctx.drawImage(g.img, col*g.fw, row*g.fh, g.fw, g.fh, x - g.fw*scale/2, y - g.fh*scale, g.fw*scale, g.fh*scale);
-}
-function drawGridSpriteFrame(g, frame, x, y, scale){ const col=frame%g.cols, row=Math.floor(frame/g.cols); ctx.drawImage(g.img, col*g.fw, row*g.fh, g.fw, g.fh, x-g.fw*scale/2, y-g.fh*scale, g.fw*scale, g.fh*scale); }
-// 精灵图带纯色底时的抽帧版：色键抠掉底，再裁剪到内容包围盒
-function keySprite(img, fw, fh, count){
-  const c=document.createElement('canvas'); c.width=fw; c.height=fh;
-  const x=c.getContext('2d',{willReadFrequently:true});
-  x.drawImage(img,0,0,fw,fh,0,0,fw,fh);
-  const d=x.getImageData(0,0,fw,fh), p=d.data;
-  // 底色=四边中位色（自动适配黑/紫底），洪水填充只清与边框连通的近底色区
-  const samp=[]; for(let px=0;px<fw;px+=7){samp.push([px,0]);samp.push([px,fh-1]);} for(let py=0;py<fh;py+=7){samp.push([0,py]);samp.push([fw-1,py]);}
-  let br=0,bg2=0,bb=0; samp.forEach(([px,py])=>{const i=(py*fw+px)*4; br+=p[i];bg2+=p[i+1];bb+=p[i+2];});
-  br/=samp.length; bg2/=samp.length; bb/=samp.length;
-  const W=fw,H=fh, seen=new Uint8Array(W*H), q=[];
-  const isBg=(px,py)=>{const i=(py*W+px)*4; return Math.abs(p[i]-br)<50&&Math.abs(p[i+1]-bg2)<50&&Math.abs(p[i+2]-bb)<50;};
-  for(let px=0;px<W;px++){q.push([px,0]);q.push([px,H-1]);}
-  for(let py=0;py<H;py++){q.push([0,py]);q.push([W-1,py]);}
-  while(q.length){const [px,py]=q.pop(); if(px<0||py<0||px>=W||py>=H)continue; const id=py*W+px; if(seen[id])continue; seen[id]=1; if(!isBg(px,py))continue; p[id*4+3]=0; q.push([px+1,py],[px-1,py],[px,py+1],[px,py-1]);}
-  x.putImageData(d,0,0);
-  // 包围盒
-  let minX=fw,minY=fh,maxX=0,maxY=0;
-  for(let i=0;i<p.length;i+=4){ if(p[i+3]>0){const px=(i/4)%fw,py=Math.floor((i/4)/fw); if(px<minX)minX=px; if(px>maxX)maxX=px; if(py<minY)minY=py; if(py>maxY)maxY=py;} }
-  if(maxX<=minX) return {img:c, fw, fh, cols:1, count:1};
-  const w=maxX-minX+1, h=maxY-minY+1;
-  const c2=document.createElement('canvas'); c2.width=w; c2.height=h;
-  c2.getContext('2d').drawImage(c,minX,minY,w,h,0,0,w,h);
-  return {img:c2, fw:w, fh:h, cols:1, count:1};
-}
-const keyedCache={};
-function keyBlackSprite(g){
-  if(g.__keyed) return g.__keyed;
-  const cols=g.cols, rows=Math.ceil(g.count/cols);
-  const c=document.createElement('canvas'); c.width=g.img.width; c.height=g.img.height;
-  const x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(g.img,0,0);
-  const d=x.getImageData(0,0,c.width,c.height), p=d.data;
-  for(let i=0;i<p.length;i+=4){ const m=Math.max(p[i],p[i+1],p[i+2]); if(m<28){p[i+3]=0;} else if(m<70){const t=(m-28)/42; p[i+3]=Math.round(p[i+3]*(0.5+0.5*t));} }
-  x.putImageData(d,0,0);
-  g.__keyed={img:c, fw:g.fw, fh:g.fh, cols:g.cols, count:g.count};
-  return g.__keyed;
-}
-function drawAnchored(name, g, x, y, scale, fps){
-  // 以脚点 (x,y) 为锚，帧底对齐；走路插值由外层维护 starPos
-  const total=g.count, f=(Math.floor(animFrame/(60/Math.max(fps,1)))%total+total)%total;
-  const col=f%g.cols, row=Math.floor(f/g.cols);
-  const w=g.fw*scale, h=g.fh*scale;
-  ctx.drawImage(g.img, col*g.fw, row*g.fh, g.fw, g.fh, x-w/2, y-h, w, h);
-}
-function drawOfficeCat(x, y, state, walking){
-  const working = !walking && ['writing','executing','replying'].includes(state);
-  const pose = working ? (Math.floor(animFrame/8)%2 ? 'typing-left':'typing-right')
-    : (Math.floor(animFrame)%240 >= 228 ? 'blink':'idle');
-  const image = SPR['cat-'+pose] || SPR['cat-idle'];
-  if(!image) return;
-  const bob = walking ? Math.sin(animFrame/4)*3 : Math.sin(animFrame/30)*1;
-  ctx.drawImage(image, x-64, y-128+bob, 128, 128);
-  if(working){
-    ctx.fillStyle='#514f58';ctx.fillRect(x-37,y-16,74,12);
-    ctx.fillStyle='#b7bdc2';
-    for(let row=0;row<2;row++)for(let col=0;col<9;col++)ctx.fillRect(x-33+col*8,y-14+row*5,5,3);
-  }
-  const badge = {researching:'?',receiving:'…',syncing:'↻',error:'!'}[state];
-  if(badge){ctx.save();ctx.font='bold 22px sans-serif';ctx.textAlign='center';ctx.fillStyle=state==='error'?'#ed6455':'#f5df9b';ctx.fillText(badge,x+46,y-108+bob);ctx.restore();}
-}
-function draw(timestamp){ const dt=lastTick ? Math.min(50, Math.max(0,timestamp-lastTick)) : 0; lastTick=timestamp; try { drawInner(dt); } catch(e){ ctx.font='28px monospace'; ctx.fillStyle='#f33'; ctx.fillText('ERR:'+e.message, 40, 380); throw e; } }
-function drawInner(dt){
-  if(window.__demoMode){window.demoEase(); const c=window.__cam; ctx.save(); ctx.translate(640,400); ctx.scale(c.z,c.z); ctx.translate(-c.x,-c.y);}
-  animFrame += dt/1000*60;
-  ctx.imageSmoothingEnabled=false;
-  ctx.clearRect(0,0,1280,720);
-  if(SPR.bg) ctx.drawImage(SPR.bg,0,0,1280,720);
-  // 装饰（静态帧位）
-  if(SPR.posters){ const f0=16+(Math.floor(animFrame/600)%8)*2; drawGridSpriteFrame(SPR.posters, f0, 252, 226, .9); }
-  if(SPR.plants){ drawGridSpriteFrame(SPR.plants, 5, 230, 300, 1); drawGridSpriteFrame(SPR.plants, 12, 977, 610, 1); }
-  if(SPR.sofa){ const sc=.8; ctx.drawImage(SPR.sofa, 640-128*sc, 60, 256*sc, 256*sc); }
-  if(SPR.flowers) ctx.drawImage(SPR.flowers, 282, 356, 52, 52);
-  // 服务器房 = pm2 机房；dsh 挂了/模型挂了 → 服务器区变暗
-  if(SPR.servers){
-    ctx.save(); if(!svc.model||!svc.pm2) ctx.globalAlpha=.25;
-    drawGridSprite(SPR.servers, 1041, 393, .9, svc.model?6:0.8, 0); ctx.restore();
-  }
-  // 同步动画（syncing 或后台有 running dtask 时展示）
-  if(SPR.syncing && (selfState==='syncing' || window.__busyTasks)) drawGridSprite(SPR.syncing, 1157, 692, .8, 12, 1);
-  // 桌 + 角色（Star-Office 的 depth 顺序：star(900) < desk(1000)）
-  // 走路插值
-  if(walkTo){ walkT=Math.min(1,walkT+dt/1400); starPos={x:walkFrom.x+(walkTo.x-walkFrom.x)*walkT, y:walkFrom.y+(walkTo.y-walkFrom.y)*walkT}; if(walkT>=1) walkTo=null; }
-  const at = starPos;
-  if(SPR.desk) ctx.drawImage(SPR.desk, 118, 336, 276, 214);
-  drawOfficeCat(at.x, at.y, selfState, Boolean(walkTo));
-  // 猫（常驻，随机帧慢放）
-  if(SPR.cats) drawGridSpriteFrame(SPR.cats, 3+(Math.floor(animFrame/300)%3)*4, 118, 700, .62);
-  // error 红色氛围
-  if(selfState==='error'){ ctx.fillStyle='rgba(200,30,30,'+(0.06+0.05*Math.sin(animFrame/10))+')'; ctx.fillRect(0,0,1280,720); }
-  // 雪（现实同步）
-  if(window.__snow){ /* DOM 层负责 */ }
-  if(window.__demoMode) ctx.restore();
-  requestAnimationFrame(draw);
-}
-loadAll().then(()=>{ requestAnimationFrame(draw); });
-
-// ===== 昨日回顾 / 天气 =====
-function yesterdayMemo(){
-  fetch('/api/town-events-brief?day=yesterday').then(r=>r.json()).then(list=>{
-    let done=0,failed=0; (list||[]).forEach(e=>{ if(e.type==='task'&&e.status==='done')done++; if(e.type==='task'&&(e.status==='failed'||e.status==='timeout'))failed++; });
-    $('memo').textContent = done+failed? `昨日：收成${done}·枯苗${failed}` : '昨日休耕';
-  }).catch(()=>{});
-}
-fetch('/api/town-snapshot').then(r=>r.json()).then(s=>{Object.values(s.entities||{}).sort((a,b)=>a.seq-b.seq).forEach(paint);(s.events||[]).slice().reverse().forEach(e=>{lastSeq=Math.max(lastSeq,e.seq);addEv(e);if(!s.entities)paint(e);}); lastSeq=Math.max(lastSeq,s.seq||0); if(s.events&&s.events[0]) $('sbSeq').textContent='· 第 '+s.events[0].seq+' 手'; yesterdayMemo();}).catch(()=>yesterdayMemo()).finally(connect);
-
-function refreshWeather(){ fetch('/api/town-weather').then(r=>r.json()).then(d=>{
-  clearInterval(window.__weatherTimer); $('snowfx').replaceChildren(); const c=d.current,code=c.weather_code;
-  const snow=[71,73,75,77,85,86].includes(code), rain=[51,53,55,61,63,65,80,81,82].includes(code);
-  $('weather').textContent=`${snow?'❄️雪':rain?'🌧️雨':code>=1?'☁️':'☀️'} ${Math.round(c.temperature_2m)}° 北京`;
-  if(snow||rain){ window.__snow=snow; const L=$('snowfx'); L.replaceChildren(); clearInterval(window.__weatherTimer); const ch=snow?'❄':'💧';
-    window.__weatherTimer=setInterval(()=>{const s=document.createElement('span');s.textContent=ch;s.style.cssText=`position:absolute;left:${Math.random()*100}vw;top:-20px;font-size:${10+Math.random()*10}px;transition:transform 7s linear,opacity 7s`;L.appendChild(s);requestAnimationFrame(()=>{s.style.transform='translateY(105vh)';s.style.opacity=.2;});setTimeout(()=>s.remove(),7200);}, snow?420:220); }
-}).catch(()=>{ $('weather').textContent='天气暂不可用'; }); }
-refreshWeather(); setInterval(refreshWeather,900000);
-
-setInterval(()=>{ $('clock').textContent=new Date().toLocaleString('zh-CN',{hour12:false}); },1000);
-
-// ===== 视频演示控制 API =====
-(function(){
-  let cam={x:640,y:360,z:1, tx:640,ty:360,tz:1};
-  const _di=setSelf;
-  window.__demoMode=false;
-  window.setFeed=function(){};
-  window.demo=function(x,y,z){window.__demoMode=true;cam.tx=x;cam.ty=y;cam.tz=z;};
-  window.demoEase=function(){cam.x+=(cam.tx-cam.x)*0.04;cam.y+=(cam.ty-cam.y)*0.04;cam.z+=(cam.tz-cam.z)*0.04;};
-  window.__cam=cam;
-  // 挂到 drawInner 末尾（rAF 每帧）
-  const _origDraw = window.__origDrawInner || drawInner;
-  window.__origDrawInner = _origDraw;
-  // Normal rendering uses a single animation loop; camera is opt-in via demo().
-})();
-</script>
-</body>
-</html>
+// Four-neighbour BFS on a 10px grid, expanded obstacles protect the sprite footprint.
+function passable(x,y){return x>=20&&y>=40&&x<=980&&y<=height-20&&!obstacles.some(o=>x>o.x-10&&x<o.x+o.w+10&&y>o.y-10&&y<o.y+o.h+10)}
+function nearest(point){let best=null,dist=Infinity;for(let y=40;y<=height-20;y+=10)for(let x=20;x<=980;x+=10){if(!passable(x,y))continue;const d=Math.abs(x-point.x)+Math.abs(y-point.y);if(d<dist){dist=d;best={x,y}}}return best}
+function findPath(start,target){const a=nearest(start),b=nearest(target);if(!a||!b)return [];const key=p=>p.x+','+p.y,q=[a],seen=new Map([[key(a),null]]);let end=null;for(let i=0;i<q.length;i++){const p=q[i];if(key(p)===key(b)){end=p;break}for(const [dx,dy]of [[10,0],[-10,0],[0,10],[0,-10]]){const n={x:p.x+dx,y:p.y+dy},k=key(n);if(passable(n.x,n.y)&&!seen.has(k)){seen.set(k,p);q.push(n)}}}if(!end)return [];const result=[];while(end){result.push(end);end=seen.get(key(end))}return result.reverse()}
+function destination(a,kind){let target=seats[a.seat];if(kind==='library')target={x:800,y:225};if(kind==='sofa')target={x:155,y:height-140};if(kind==='wander')target={x:50+Math.random()*600,y:40+Math.random()*(height-80)};a.path=findPath(a,target);a.destination=kind;a.wait=0;if(a.path.length){a.x=a.path[0].x;a.y=a.path[0].y;}if(selected===a.id)details()}
+function human(a){const g=svg('g',{'class':'agent','tabindex':0,'role':'button','aria-label':a.name},$('people'));svg('ellipse',{cx:0,cy:2,rx:17,ry:5,fill:'#36454c',opacity:.16},g);rect(g,-17,-51,34,58,'transparent',{'class':'selection',rx:5});
+ const body=svg('g',{'class':'body'},g);rect(body,-10,-23,20,22,a.color);rect(body,-10,-1,7,10,'#3d495a',{'class':'leg left'});rect(body,3,-1,7,10,'#3d495a',{'class':'leg right'});
+ const headPlacement=svg('g',{'class':'head-placement'},g);const head=svg('g',{'class':'head'},headPlacement);rect(head,-13,-46,26,24,'#e7bb92');rect(head,-15,-49,30,10,a.hair);rect(head,-15,-43,5,12,a.hair);rect(head,10,-43,5,12,a.hair);rect(head,-8,-34,3,4,'#303747');rect(head,5,-34,3,4,'#303747');rect(head,-3,-26,6,2,'#a57564');
+ rect(g,-15,-15,9,5,'#e7bb92',{'class':'paw left'});rect(g,6,-15,9,5,'#e7bb92',{'class':'paw right'});const book=svg('g',{'class':'book',visibility:'hidden'},g);rect(book,-15,-19,14,14,'#fff0ca');rect(book,0,-19,14,14,'#eadcb6');rect(book,-1,-19,2,15,'#997553');a.badge=text(g,25,-45,'',18);a.nameNode=text(g,0,28,a.name,10);g.addEventListener('click',()=>select(a.id));g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(a.id)}});a.node=g;return g}
+function renderAgents(){for(const a of agents){if(!a.node)human(a);const seated=!a.path.length&&a.destination==='desk';const resting=!a.path.length&&a.destination==='sofa';a.node.setAttribute('transform',`translate(${a.x} ${a.y})`);a.node.setAttribute('class',`agent ${selected===a.id?'selected':''} ${seated&&['writing','executing','replying'].includes(a.state)?'typing':''} ${resting?'resting':''} ${a.state==='done'?'happy':''} ${['anxious','error'].includes(a.state)?'anxious':''}`);a.node.querySelector('.book').setAttribute('visibility',!a.path.length&&a.destination==='library'?'visible':'hidden');a.node.querySelector('.body').setAttribute('visibility',seated?'hidden':'visible');a.node.querySelectorAll('.paw').forEach(n=>n.setAttribute('visibility',seated&&['writing','executing','replying'].includes(a.state)?'visible':'hidden'));
+ // Desk seat head is above the screen; the torso is occluded, not standing on furniture.
+ a.node.querySelector('.head-placement').setAttribute('transform',seated?'translate(0 35)':'');a.node.querySelectorAll('.paw').forEach(n=>n.setAttribute('y',seated?45:-15));
+ a.badge.setAttribute('y',seated?-20:-45);a.nameNode.setAttribute('y',seated?85:28);
+ a.badge.textContent=a.path.length?'→':resting?'z':({thinking:'?',researching:'?',anxious:'!',blocked:'…',error:'!',done:'✦',idle:'·',syncing:'↻'}[a.state]||'');
+ if(a.path.length){const stride=Math.floor(performance.now()/160)%2;a.node.querySelector('.leg.left').setAttribute('y',stride?2:-1);a.node.querySelector('.leg.right').setAttribute('y',stride?-1:2);}}
+ $('routes').replaceChildren();const a=agents.find(a=>a.id===selected);if(showPaths&&a&&a.path.length)svg('polyline',{points:[{x:a.x,y:a.y},...a.path].map(p=>p.x+','+p.y).join(' '),'class':'route'},$('routes'));}
+const services=new Map();
+function renderServers(){const root=$('servers');root.replaceChildren();for(let i=0;i<3;i++){const data=[...services.values()][i]||{name:'服务器 '+(i+1),load:null,status:'unknown'},x=735+i*83,y=height-190,busy=data.load!==null&&data.load>=81;const g=svg('g',{},root);rect(g,x,y,68,120,'#43526a');rect(g,x+4,y+4,60,112,'#29394e');for(let r=0;r<5;r++){rect(g,x+8,y+9+r*18,52,13,'#53657a');rect(g,x+12,y+13+r*18,4,4,data.status==='down'?'#df7b6b':data.load===null?'#9babb7':'#8fca83',{'class':data.load?'lamp':''})}rect(g,x+8,y+103,52,8,'#79818b');if(data.load!==null)rect(g,x+9,y+104,Math.max(1,50*data.load/100),6,busy?'#dd8272':'#8ac487');text(g,x+34,y-12,(data.load===null?(data.status==='up'?'在线 · 负载未知':'负载未知'):data.load+'%'),10);text(g,x+34,y+140,data.name.slice(0,10),9);if(busy)for(let j=0;j<3;j++)svg('circle',{cx:x+16+j*17,cy:y-22,r:5,fill:'#f5f5e8',class:'smoke',style:`animation-delay:${j*.4}s`},g)}}
+function addAgent(id,name,seat,state='idle'){const a={id,name,seat,color:palette[seat%palette.length],hair:['#3f3433','#6e4833','#273b48'][seat%3],state,task:'尚未上报任务',step:'等待任务',progress:null,history:[],path:[],destination:'desk',wait:0,...seats[seat]};agents.push(a);renderAgents();return a}
+function select(id){selected=id;details();renderAgents()}
+function details(){const a=agents.find(x=>x.id===selected);if(!a)return;$('name').textContent=a.name;$('status').textContent=a.path.length?'沿通道行走':a.destination==='sofa'?'沙发休息':labels[a.state]||a.state;$('task').textContent=a.task;$('step').textContent=a.step;$('progress').hidden=a.progress===null;$('progress').value=a.progress||0;$('percent').textContent=a.progress===null?'进度未上报':a.progress+'%';$('history').replaceChildren();for(const item of a.history.slice(-6)){const li=document.createElement('li');li.textContent=item;$('history').append(li)}}
+function demo(){mode='demo';agents=[];$('people').replaceChildren();services.clear();['闲置','正常','繁忙'].forEach((n,i)=>services.set(n,{name:n,load:[8,46,92][i],status:'up'}));['林舟','许言','苏禾','程远','沈宁','顾安'].forEach((n,i)=>{if(i>=capacity)return;const a=addAgent('demo-'+i,n,i,['writing','anxious','done','thinking','researching','idle'][i]);a.task=['整理季度经营报告','排查数据同步异常','完成接口测试','设计数据校验规则','查阅归档资料','等待下一项任务'][i];a.step='演示行为 · 未接入真实任务';a.progress=i===0?68:null;a.history=['09:32 接收任务','09:35 查阅资料','09:41 处理任务'];if(i===4)destination(a,'library');if(i===5)destination(a,'sofa')});select('demo-0');renderServers();modeUI()}
+function modeUI(){$('live').classList.toggle('active',mode==='live');$('demo').classList.toggle('active',mode==='demo');$('modeLabel').textContent=mode==='demo'?'演示模式 · 所有任务与负载均为模拟数据':'实时模式 · 未上报的进度与负载保持未知';$('add').disabled=mode!=='demo'}
+function event(e){if(mode!=='live')return;if(e.type==='state'||e.type==='task'){const id=e.type==='state'?String(e.subject||'me'):String(e.agent_id||'me');let a=agents.find(a=>a.id===id);if(!a){if(agents.length>=capacity){$('notice').textContent='工位已满，请增加工位以展示更多角色';return}a=addAgent(id,e.agent_name||id,agents.length)}a.state=e.status==='running'?'executing':e.status==='failed'?'error':e.status;a.task=e.summary||a.task;a.step=e.detail||e.summary||labels[a.state]||a.state;a.progress=Number.isFinite(e.progress)?Math.max(0,Math.min(100,e.progress)):null;a.history.push(new Date(e.ts).toLocaleTimeString('zh-CN')+' '+a.step);destination(a,a.state==='researching'?'library':'desk');if(!selected)selected=id;details()}
+ if(e.type==='heartbeat'||e.type==='process'||e.type==='service'){services.set(e.subject,{name:e.subject,status:e.status,load:Number.isFinite(e.load)?Math.max(0,Math.min(100,e.load)):null});renderServers()}
+ const div=document.createElement('div');div.textContent=(e.subject||'')+' · '+(e.summary||e.status);$('feed').prepend(div);while($('feed').children.length>30)$('feed').lastChild.remove();}
+async function connect(){clearTimeout(reconnect);try{const r=await fetch('/api/town-snapshot');if(!r.ok)throw Error();const snap=await r.json();if(mode==='live'){Object.values(snap.entities||{}).sort((a,b)=>a.seq-b.seq).forEach(event);if(!snap.entities)(snap.events||[]).slice().reverse().forEach(event)}lastSeq=Math.max(lastSeq,snap.seq||0)}catch{$('connection').textContent='快照不可用 · 等待事件流'}if(source)source.close();source=new EventSource('/api/town-events?after='+lastSeq);source.onopen=()=>$('connection').textContent='实时事件已连接';source.onmessage=m=>{try{const e=JSON.parse(m.data);if(e.seq<=lastSeq)return;lastSeq=e.seq;event(e)}catch{}};source.onerror=()=>{$('connection').textContent='连接中断 · 正在重试';source.close();reconnect=setTimeout(connect,5000)}}
+$('demo').onclick=demo;$('live').onclick=()=>{mode='live';agents=[];selected=null;services.clear();$('people').replaceChildren();$('routes').replaceChildren();$('name').textContent='等待角色上报';$('status').textContent='未知';$('task').textContent='等待真实任务';$('step').textContent='—';$('history').replaceChildren();$('progress').hidden=true;$('percent').textContent='进度未上报';modeUI();renderServers();connect()};$('desks').onchange=()=>{const n=Number($('desks').value);if(n<agents.length){$('notice').textContent='工位数不能少于当前角色数';$('desks').value=capacity;return}capacity=n;rebuild()};$('add').onclick=()=>{if(agents.length>=capacity){$('notice').textContent='工位已满，请先增加工位';return}const a=addAgent('demo-'+Date.now(),'同事 '+(agents.length+1),agents.length);a.task='演示 · 等待任务';select(a.id)};$('paths').onclick=()=>{showPaths=!showPaths;$('paths').textContent=showPaths?'隐藏路线':'显示路线';$('paths').setAttribute('aria-pressed',showPaths);renderAgents()};$('follow').onclick=()=>{showPaths=true;$('paths').textContent='隐藏路线';$('paths').setAttribute('aria-pressed','true');renderAgents()};$('pause').onclick=()=>{paused=!paused;$('pause').textContent=paused?'继续动画':'暂停动画';$('pause').setAttribute('aria-pressed',paused);$('map').style.visibility='visible';document.querySelectorAll('#map *').forEach(e=>e.style.animationPlayState=paused?'paused':'running')};
+function frame(t){const dt=lastTime?Math.min((t-lastTime)/1000,.05):0;lastTime=t;if(!paused){for(const a of agents){if(a.path.length){const p=a.path[0],dx=p.x-a.x,dy=p.y-a.y,d=Math.hypot(dx,dy),step=70*dt;if(d<=step){a.x=p.x;a.y=p.y;a.path.shift();if(!a.path.length){if(a.destination==='desk'){Object.assign(a,seats[a.seat])}if(a.destination==='sofa'){a.x=155;a.y=height-75;}a.wait=0;if(a.id===selected)details()}}else{a.x+=dx/d*step;a.y+=dy/d*step}}else if(a.state==='idle'){a.wait+=dt;if(a.wait>12)destination(a,a.destination==='sofa'?'wander':Math.random()<.5?'sofa':'wander')}else if(mode==='demo'&&a.state==='researching'){a.wait+=dt;if(a.wait>15){a.state='writing';a.step='查阅完成，返回工位整理';destination(a,'desk')}}}renderAgents();if(reducedMotion)document.querySelectorAll('#map *').forEach(e=>e.style.animation='none')}requestAnimationFrame(frame)}
+rebuild();modeUI();connect();requestAnimationFrame(frame);setInterval(()=>$('clock').textContent=new Date().toLocaleString('zh-CN',{hour12:false}),1000);
+// Read-only hooks for local regression validation.
+window.office={findPath,passable,get seats(){return seats},get agents(){return agents},get height(){return height},demo};
+</script></html>

@@ -1,20 +1,9 @@
-const {test}=require('node:test');
-const assert=require('node:assert/strict');
-const fs=require('fs'),path=require('path'),vm=require('vm');
-test('all work states render the SVG cat without legacy character sheets',()=>{
- const html=fs.readFileSync(path.join(__dirname,'../frontend/town.html'),'utf8');
- assert.ok(!html.includes("loadImg(A+'star-idle"));assert.ok(!html.includes('star-work-clean.png'));
- const calls=[];const ctx=new Proxy({}, {get:(o,k)=>o[k]||((...args)=>{if(k==='drawImage')calls.push(args)})});
- const nodes=new Proxy({}, {get:(o,k)=>o[k]||(o[k]={style:{},getContext:()=>ctx})});
- const context={document:{getElementById:id=>nodes[id]},window:{},Image:class{},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout(){},requestAnimationFrame(){},console};
- vm.createContext(context);vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
- vm.runInContext(`for(const pose of ['idle','blink','typing-left','typing-right'])SPR['cat-'+pose]={pose};
- for(const state of Object.keys(STATE_LABEL)){setSelf(state,'test');drawInner(16);}
- drawOfficeCat(100,200,'writing',false);animFrame=8;drawOfficeCat(100,200,'writing',false);
- let intervals=[];drawInner=dt=>intervals.push(dt);draw(100000);draw(100016);if(intervals.join()!=='0,16')throw Error('frame timing');`,context);
- assert.ok(calls.some(([image])=>image.pose==='typing-left'));assert.ok(calls.some(([image])=>image.pose==='typing-right'));
- for(const pose of ['idle','blink','typing-left','typing-right']){
- const svg=fs.readFileSync(path.join(__dirname,`../frontend/assets/office-cat-${pose}.svg`),'utf8');
- assert.match(svg,/viewBox="0 0 64 64"/);assert.ok(!/<script|<image|href=/.test(svg));
- }
-});
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),path=require('path');
+class Element{
+ constructor(){this.children=[];this.style={};this.classList={toggle(){}};this.attrs={};this.value=6;this.hidden=false}
+ setAttribute(k,v){this.attrs[k]=v} append(...els){this.children.push(...els)}prepend(e){this.children.unshift(e)}replaceChildren(){this.children=[]}addEventListener(){}querySelector(){return new Element()}querySelectorAll(){return [new Element(),new Element()]}remove(){} get lastChild(){return this.children.at(-1)}
+}
+function setup(){const nodes={};const document={getElementById:id=>nodes[id]||(nodes[id]=new Element()),createElementNS:()=>new Element(),createElement:()=>new Element(),querySelectorAll:()=>[]};const context={document,window:{},performance:{now:()=>0},fetch:()=>new Promise(()=>{}),setTimeout(){},clearTimeout(){},setInterval(){},requestAnimationFrame(){},console};vm.createContext(context);const html=fs.readFileSync(path.join(__dirname,'../frontend/town.html'),'utf8');vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);return context}
+test('all desk layouts provide obstacle-free orthogonal routes to library and sofa',()=>{const c=setup();for(const capacity of [6,9,12,18]){vm.runInContext(`capacity=${capacity};rebuild();`,c);const office=c.window.office;assert.equal(office.seats.length,capacity);for(const start of office.seats){for(const end of [{x:800,y:225},{x:155,y:office.height-140}]){const route=office.findPath(start,end);assert.ok(route.length>0);for(let i=0;i<route.length;i++){assert.ok(office.passable(route[i].x,route[i].y));if(i)assert.equal(Math.abs(route[i].x-route[i-1].x)+Math.abs(route[i].y-route[i-1].y),10)}}}}});
+test('demo agents have unique desks and real events cannot mutate demonstration',()=>{const c=setup();c.window.office.demo();const agents=c.window.office.agents;assert.equal(agents.length,6);assert.equal(new Set(agents.map(a=>a.seat)).size,6);const before=agents[0].task;vm.runInContext(`event({type:'state',subject:'demo-0',summary:'overwrite',status:'error'});`,c);assert.equal(agents[0].task,before)});
+test('live mode creates multiple humans with unknown unreported progress',()=>{const c=setup();vm.runInContext(`event({type:'state',subject:'alice',status:'writing',summary:'报告',ts:new Date().toISOString()});event({type:'state',subject:'bob',status:'researching',summary:'查资料',ts:new Date().toISOString()});`,c);assert.equal(c.window.office.agents.length,2);assert.equal(c.window.office.agents[0].progress,null);assert.ok(c.window.office.agents[1].path.length>0)});
